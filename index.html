@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GameNight - Friend's Leaderboard</title>
+    <meta name="description" content="Track your game night scores and see who reigns supreme among your friends.">
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon">🏆</div>
+                <h1>GameNight<span>Leaderboard</span></h1>
+            </div>
+            <div class="header-right">
+                <div class="search-container">
+                    <input type="text" id="search-input" placeholder="Search games or players...">
+                    <span class="search-icon">🔍</span>
+                </div>
+                <button id="add-score-btn" class="btn-primary">Add New Score</button>
+            </div>
+        </header>
+
+        <main>
+            <section class="stats-overview">
+                <div class="stat-card">
+                    <span class="stat-label">Total Games</span>
+                    <span class="stat-value" id="total-games">0</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Top Player</span>
+                    <span class="stat-value" id="top-player">-</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Most Played Game</span>
+                    <span class="stat-value" id="most-played">-</span>
+                </div>
+            </section>
+
+            <section class="leaderboard-section">
+                <div class="section-header">
+                    <h2>Current Standings</h2>
+                </div>
+                <div class="leaderboard-card">
+                    <table id="leaderboard-table">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Player</th>
+                                <th>Games</th>
+                                <th>Total Score</th>
+                                <th>Win Rate</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboard-body">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section class="recent-history">
+                <div class="section-header">
+                    <h2>Recent Games</h2>
+                </div>
+                <div id="games-list" class="games-grid">
+                    <!-- Populated by JS -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Add Score Modal -->
+    <div id="score-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Record a Game</h2>
+                <button class="close-btn">&times;</button>
+            </div>
+            <form id="add-score-form">
+                <input type="hidden" id="entry-id">
+                <div class="form-group">
+                    <label for="game-name">Game Name</label>
+                    <input type="text" id="game-name" placeholder="e.g. Catan, Poker, Monopoly" required>
+                </div>
+                <div class="form-group">
+                    <label for="player-name">Winner Name</label>
+                    <input type="text" id="player-name" placeholder="Enter friend's name" required>
+                </div>
+                <div class="form-group">
+                    <label for="score">Score / Points</label>
+                    <input type="number" id="score" placeholder="Points awarded" required>
+                </div>
+                <div class="form-group">
+                    <label for="game-date">Date</label>
+                    <input type="date" id="game-date" required>
+                </div>
+                <button type="submit" class="btn-submit">Save Result</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

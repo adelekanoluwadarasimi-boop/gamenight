@@ -1,0 +1,4 @@
+# Local storage/browser state not applicable to git
+.DS_Store
+node_modules/
+.env
