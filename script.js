@@ -1,16 +1,7 @@
-// Data Management
-const demoData = [
-    { id: 1, game: 'Catan', winner: 'Alex', score: 10, date: '2026-01-10' },
-    { id: 2, game: 'Poker', winner: 'Jordan', score: 500, date: '2026-01-12' },
-    { id: 3, game: 'Monopoly', winner: 'Alex', score: 1500, date: '2026-01-14' },
-    { id: 4, game: 'Codenames', winner: 'Sam', score: 1, date: '2026-01-15' }
-];
+// API Configuration
+const API_URL = 'http://127.0.0.1:5000/api/games';
 
-let games = JSON.parse(localStorage.getItem('gameNight_games')) || demoData;
-if (!localStorage.getItem('gameNight_games')) {
-    localStorage.setItem('gameNight_games', JSON.stringify(demoData));
-}
-
+let games = [];
 let isEditing = false;
 
 const DOM = {
@@ -30,8 +21,8 @@ const DOM = {
 };
 
 // Initialize App
-function init() {
-    updateUI();
+async function init() {
+    await fetchGames();
 
     // Event Listeners
     DOM.addBtn.addEventListener('click', () => {
@@ -52,7 +43,17 @@ function init() {
     DOM.searchInput.addEventListener('input', (e) => updateUI(e.target.value));
 }
 
-function handleFormSubmit(e) {
+async function fetchGames() {
+    try {
+        const response = await fetch(API_URL);
+        games = await response.json();
+        updateUI();
+    } catch (error) {
+        console.error('Error fetching games:', error);
+    }
+}
+
+async function handleFormSubmit(e) {
     e.preventDefault();
 
     const entryData = {
@@ -62,32 +63,53 @@ function handleFormSubmit(e) {
         date: document.getElementById('game-date').value
     };
 
-    if (isEditing) {
-        const id = parseInt(DOM.entryId.value);
-        const index = games.findIndex(g => g.id === id);
-        if (index !== -1) {
-            games[index] = { ...games[index], ...entryData };
+    try {
+        if (isEditing) {
+            const id = parseInt(DOM.entryId.value);
+            const response = await fetch(`${API_URL}/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(entryData)
+            });
+            if (response.ok) {
+                const updatedGame = await response.json();
+                const index = games.findIndex(g => g.id === id);
+                games[index] = updatedGame;
+            }
+        } else {
+            const newEntry = { id: Date.now(), ...entryData };
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newEntry)
+            });
+            if (response.ok) {
+                const addedGame = await response.json();
+                games.unshift(addedGame);
+            }
         }
-    } else {
-        const newGame = {
-            id: Date.now(),
-            ...entryData
-        };
-        games.unshift(newGame);
+
+        updateUI();
+        DOM.modal.classList.remove('active');
+        DOM.form.reset();
+    } catch (error) {
+        console.error('Error saving game:', error);
     }
-
-    localStorage.setItem('gameNight_games', JSON.stringify(games));
-
-    updateUI();
-    DOM.modal.classList.remove('active');
-    DOM.form.reset();
 }
 
-function deleteGame(id) {
+async function deleteGame(id) {
     if (confirm('Are you sure you want to delete this game record?')) {
-        games = games.filter(g => g.id !== id);
-        localStorage.setItem('gameNight_games', JSON.stringify(games));
-        updateUI();
+        try {
+            const response = await fetch(`${API_URL}/${id}`, {
+                method: 'DELETE'
+            });
+            if (response.ok) {
+                games = games.filter(g => g.id !== id);
+                updateUI();
+            }
+        } catch (error) {
+            console.error('Error deleting game:', error);
+        }
     }
 }
 
