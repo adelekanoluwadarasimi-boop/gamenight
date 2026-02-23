@@ -1,5 +1,7 @@
-// API Configuration
-const API_URL = '/api/games';
+// Supabase Configuration
+const SUPABASE_URL = 'https://mqkniqvfntchiatzlsla.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1xa25pcXZmbnRjaGlhdHpsc2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4NTYyMDksImV4cCI6MjA4NzQzMjIwOX0.YTNzrrHflQ2ymYNGYYDKAaVUrNwafXw9EN1qNT2guyA';
+const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let games = [];
 let isEditing = false;
@@ -45,11 +47,16 @@ async function init() {
 
 async function fetchGames() {
     try {
-        const response = await fetch(API_URL);
-        games = await response.json();
+        const { data, error } = await _supabase
+            .from('games')
+            .select('*')
+            .order('date', { ascending: false });
+
+        if (error) throw error;
+        games = data || [];
         updateUI();
     } catch (error) {
-        console.error('Error fetching games:', error);
+        console.error('Error fetching from Supabase:', error.message);
     }
 }
 
@@ -66,49 +73,47 @@ async function handleFormSubmit(e) {
     try {
         if (isEditing) {
             const id = parseInt(DOM.entryId.value);
-            const response = await fetch(`${API_URL}/${id}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(entryData)
-            });
-            if (response.ok) {
-                const updatedGame = await response.json();
-                const index = games.findIndex(g => g.id === id);
-                games[index] = updatedGame;
-            }
+            const { data, error } = await _supabase
+                .from('games')
+                .update(entryData)
+                .eq('id', id)
+                .select();
+
+            if (error) throw error;
+            const index = games.findIndex(g => g.id === id);
+            if (index !== -1) games[index] = data[0];
         } else {
-            const newEntry = { id: Date.now(), ...entryData };
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newEntry)
-            });
-            if (response.ok) {
-                const addedGame = await response.json();
-                games.unshift(addedGame);
-            }
+            const { data, error } = await _supabase
+                .from('games')
+                .insert([entryData])
+                .select();
+
+            if (error) throw error;
+            games.unshift(data[0]);
         }
 
         updateUI();
         DOM.modal.classList.remove('active');
         DOM.form.reset();
     } catch (error) {
-        console.error('Error saving game:', error);
+        console.error('Error saving to Supabase:', error.message);
+        alert('Failed to save score. Please check your Supabase table settings.');
     }
 }
 
 async function deleteGame(id) {
     if (confirm('Are you sure you want to delete this game record?')) {
         try {
-            const response = await fetch(`${API_URL}/${id}`, {
-                method: 'DELETE'
-            });
-            if (response.ok) {
-                games = games.filter(g => g.id !== id);
-                updateUI();
-            }
+            const { error } = await _supabase
+                .from('games')
+                .delete()
+                .eq('id', id);
+
+            if (error) throw error;
+            games = games.filter(g => g.id !== id);
+            updateUI();
         } catch (error) {
-            console.error('Error deleting game:', error);
+            console.error('Error deleting from Supabase:', error.message);
         }
     }
 }
