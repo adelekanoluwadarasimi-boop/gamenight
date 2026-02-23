@@ -1,9 +1,9 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import json
 import os
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app)
 
 DATA_FILE = 'games.json'
@@ -21,6 +21,10 @@ def save_games(games):
     with open(DATA_FILE, 'w') as f:
         json.dump(games, f, indent=2)
 
+@app.route('/')
+def index():
+    return send_from_directory('.', 'index.html')
+
 @app.route('/api/games', methods=['GET'])
 def get_games():
     games = load_games()
@@ -31,8 +35,6 @@ def add_game():
     new_game = request.json
     games = load_games()
     # Simple validation or ID generation could go here if needed
-    # Start: ensure ID is unique if not provided? Frontend seems to provide ID, but safer to handle here?
-    # script.js generates ID: Date.now(). Let's trust frontend or just accept it.
     games.insert(0, new_game) # Add to top
     save_games(games)
     return jsonify(new_game), 201
@@ -57,5 +59,7 @@ def update_game(game_id):
     return jsonify({'error': 'Game not found'}), 404
 
 if __name__ == '__main__':
-    print("Server running on http://127.0.0.1:5000")
-    app.run(debug=True, port=5000)
+    print("Server running on http://0.0.0.0:5000")
+    print("Accessible locally at http://127.0.0.1:5000")
+    app.run(debug=True, host='0.0.0.0', port=5000)
+
