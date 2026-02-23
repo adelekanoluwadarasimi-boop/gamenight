@@ -1,8 +1,5 @@
-// Supabase Configuration
-// REPLACE THESE with your actual Supabase URL and Anon Key from the project settings
-const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-const SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY';
-const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// API Configuration
+const API_URL = '/api/games';
 
 let games = [];
 let isEditing = false;
@@ -48,16 +45,11 @@ async function init() {
 
 async function fetchGames() {
     try {
-        const { data, error } = await _supabase
-            .from('games')
-            .select('*')
-            .order('date', { ascending: false });
-
-        if (error) throw error;
-        games = data || [];
+        const response = await fetch(API_URL);
+        games = await response.json();
         updateUI();
     } catch (error) {
-        console.error('Error fetching from Supabase:', error.message);
+        console.error('Error fetching games:', error);
     }
 }
 
@@ -74,47 +66,49 @@ async function handleFormSubmit(e) {
     try {
         if (isEditing) {
             const id = parseInt(DOM.entryId.value);
-            const { data, error } = await _supabase
-                .from('games')
-                .update(entryData)
-                .eq('id', id)
-                .select();
-
-            if (error) throw error;
-            const index = games.findIndex(g => g.id === id);
-            if (index !== -1) games[index] = data[0];
+            const response = await fetch(`${API_URL}/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(entryData)
+            });
+            if (response.ok) {
+                const updatedGame = await response.json();
+                const index = games.findIndex(g => g.id === id);
+                games[index] = updatedGame;
+            }
         } else {
-            const { data, error } = await _supabase
-                .from('games')
-                .insert([entryData])
-                .select();
-
-            if (error) throw error;
-            games.unshift(data[0]);
+            const newEntry = { id: Date.now(), ...entryData };
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newEntry)
+            });
+            if (response.ok) {
+                const addedGame = await response.json();
+                games.unshift(addedGame);
+            }
         }
 
         updateUI();
         DOM.modal.classList.remove('active');
         DOM.form.reset();
     } catch (error) {
-        alert('Error saving: Please ensure you have set your Supabase URL and Key properly.');
-        console.error('Error saving to Supabase:', error.message);
+        console.error('Error saving game:', error);
     }
 }
 
 async function deleteGame(id) {
     if (confirm('Are you sure you want to delete this game record?')) {
         try {
-            const { error } = await _supabase
-                .from('games')
-                .delete()
-                .eq('id', id);
-
-            if (error) throw error;
-            games = games.filter(g => g.id !== id);
-            updateUI();
+            const response = await fetch(`${API_URL}/${id}`, {
+                method: 'DELETE'
+            });
+            if (response.ok) {
+                games = games.filter(g => g.id !== id);
+                updateUI();
+            }
         } catch (error) {
-            console.error('Error deleting from Supabase:', error.message);
+            console.error('Error deleting game:', error);
         }
     }
 }
