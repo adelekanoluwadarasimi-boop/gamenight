@@ -120,6 +120,35 @@
         </div>
     </div>
 
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="auth-modal-title">Welcome Back</h2>
+                <button class="close-btn" id="close-auth">&times;</button>
+            </div>
+            <div class="auth-toggle">
+                <button id="toggle-login" class="active">Login</button>
+                <button id="toggle-signup">Sign Up</button>
+            </div>
+            <form id="auth-form">
+                <div class="form-group" id="signup-name-group" style="display: none;">
+                    <label for="signup-name">Account Name</label>
+                    <input type="text" id="signup-name" placeholder="Choose a display name">
+                </div>
+                <div class="form-group">
+                    <label for="auth-email">Email</label>
+                    <input type="email" id="auth-email" placeholder="Enter your email" required>
+                </div>
+                <div class="form-group">
+                    <label for="auth-password">Password</label>
+                    <input type="password" id="auth-password" placeholder="Enter password" required>
+                </div>
+                <button type="submit" id="auth-submit-btn" class="btn-submit">Login</button>
+            </form>
+        </div>
+    </div>
+
     <!-- Supabase Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="script.js"></script>
