@@ -31,7 +31,8 @@ const DOM = {
     toggleLogin: document.getElementById('toggle-login'),
     toggleSignup: document.getElementById('toggle-signup'),
     signupNameGroup: document.getElementById('signup-name-group'),
-    userDisplayName: document.getElementById('user-display-name')
+    userDisplayName: document.getElementById('user-display-name'),
+    proofInput: document.getElementById('game-proof')
 };
 
 // Initialize App
@@ -165,15 +166,40 @@ async function handleFormSubmit(e) {
         return;
     }
 
-    const entryData = {
-        game: document.getElementById('game-name').value,
-        winner: document.getElementById('player-name').value,
-        score: parseInt(document.getElementById('score').value),
-        date: document.getElementById('game-date').value,
-        user_id: currentUser.id // track who added it
-    };
+    DOM.submitBtn.textContent = 'Uploading Proof...';
+    DOM.submitBtn.disabled = true;
 
     try {
+        let screenshot_url = '';
+        const file = DOM.proofInput.files[0];
+
+        if (file) {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Math.random()}.${fileExt}`;
+            const filePath = `proofs/${fileName}`;
+
+            let { error: uploadError } = await _supabase.storage
+                .from('proofs')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data: urlData } = _supabase.storage
+                .from('proofs')
+                .getPublicUrl(filePath);
+
+            screenshot_url = urlData.publicUrl;
+        }
+
+        const entryData = {
+            game: document.getElementById('game-name').value,
+            winner: document.getElementById('player-name').value,
+            score: parseInt(document.getElementById('score').value),
+            date: document.getElementById('game-date').value,
+            user_id: currentUser.id,
+            screenshot_url: screenshot_url
+        };
+
         if (isEditing) {
             const id = parseInt(DOM.entryId.value);
             const { data, error } = await _supabase
@@ -200,7 +226,10 @@ async function handleFormSubmit(e) {
         DOM.form.reset();
     } catch (error) {
         console.error('Error saving:', error.message);
-        alert('Error saving. Make sure your table has a user_id column!');
+        alert('Error saving. Make sure you have created a "proofs" bucket in Supabase Storage and added a screenshot_url column to your table!');
+    } finally {
+        DOM.submitBtn.textContent = 'Save Result';
+        DOM.submitBtn.disabled = false;
     }
 }
 
@@ -237,6 +266,7 @@ function editGame(id) {
     document.getElementById('score').value = game.score;
     document.getElementById('game-date').value = game.date;
 
+    // Screenshot editing is not supported in this simple version
     DOM.scoreModal.classList.add('active');
 }
 
@@ -288,6 +318,13 @@ function renderRecentGames(data = games) {
                 <span>+${g.score} pts</span>
                 <span>${new Date(g.date).toLocaleDateString()}</span>
             </div>
+            ${g.screenshot_url ? `
+            <div class="game-proof" style="margin-top: 10px;">
+                <a href="${g.screenshot_url}" target="_blank" style="color: var(--accent); font-size: 0.8rem; text-decoration: none; display: flex; align-items: center; gap: 5px;">
+                    🖼️ View Proof Screenshot
+                </a>
+            </div>
+            ` : ''}
             ${currentUser ? `
             <div class="game-actions">
                 <button class="btn-action" onclick="editGame(${g.id})">Edit</button>
