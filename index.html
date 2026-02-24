@@ -27,7 +27,11 @@
                     <input type="text" id="search-input" placeholder="Search games or players...">
                     <span class="search-icon">🔍</span>
                 </div>
-                <button id="add-score-btn" class="btn-primary">Add New Score</button>
+                <div id="user-section" class="user-info">
+                    <span id="user-display-name"></span>
+                    <button id="auth-btn" class="btn-secondary">Login</button>
+                </div>
+                <button id="add-score-btn" class="btn-primary" style="display: none;">Add New Score</button>
             </div>
         </header>
 
@@ -91,7 +95,13 @@
                 <input type="hidden" id="entry-id">
                 <div class="form-group">
                     <label for="game-name">Game Name</label>
-                    <input type="text" id="game-name" placeholder="e.g. Catan, Poker, Monopoly" required>
+                    <select id="game-name" required>
+                        <option value="" disabled selected>Select a game</option>
+                        <option value="Blox Fruits">Blox Fruits</option>
+                        <option value="Whot">Whot</option>
+                        <option value="Jujutsu Infinite">Jujutsu Infinite</option>
+                        <option value="Shadow Boxing">Shadow Boxing</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="player-name">Winner Name</label>

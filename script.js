@@ -5,12 +5,14 @@ const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let games = [];
 let isEditing = false;
+let currentUser = null;
+let isLoginMode = true;
 
 const DOM = {
     addBtn: document.getElementById('add-score-btn'),
-    modal: document.getElementById('score-modal'),
+    scoreModal: document.getElementById('score-modal'),
     modalTitle: document.getElementById('modal-title'),
-    closeBtn: document.querySelector('.close-btn'),
+    closeBtns: document.querySelectorAll('.close-btn'),
     form: document.getElementById('add-score-form'),
     entryId: document.getElementById('entry-id'),
     leaderboardBody: document.getElementById('leaderboard-body'),
@@ -19,11 +21,22 @@ const DOM = {
     topPlayer: document.getElementById('top-player'),
     mostPlayed: document.getElementById('most-played'),
     submitBtn: document.querySelector('.btn-submit'),
-    searchInput: document.getElementById('search-input')
+    searchInput: document.getElementById('search-input'),
+    // Auth elements
+    authBtn: document.getElementById('auth-btn'),
+    authModal: document.getElementById('auth-modal'),
+    authForm: document.getElementById('auth-form'),
+    authModalTitle: document.getElementById('auth-modal-title'),
+    authSubmitBtn: document.getElementById('auth-submit-btn'),
+    toggleLogin: document.getElementById('toggle-login'),
+    toggleSignup: document.getElementById('toggle-signup'),
+    signupNameGroup: document.getElementById('signup-name-group'),
+    userDisplayName: document.getElementById('user-display-name')
 };
 
 // Initialize App
 async function init() {
+    await checkUser();
     await fetchGames();
 
     // Event Listeners
@@ -33,18 +46,103 @@ async function init() {
         DOM.submitBtn.textContent = 'Save Result';
         DOM.form.reset();
         DOM.entryId.value = '';
-        DOM.modal.classList.add('active');
+        DOM.scoreModal.classList.add('active');
     });
 
-    DOM.closeBtn.addEventListener('click', () => DOM.modal.classList.remove('active'));
+    DOM.authBtn.addEventListener('click', handleAuthAction);
+    DOM.toggleLogin.addEventListener('click', () => setAuthMode(true));
+    DOM.toggleSignup.addEventListener('click', () => setAuthMode(false));
+    DOM.authForm.addEventListener('submit', handleAuthSubmit);
+
+    DOM.closeBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            DOM.scoreModal.classList.remove('active');
+            DOM.authModal.classList.remove('active');
+        });
+    });
+
     window.addEventListener('click', (e) => {
-        if (e.target === DOM.modal) DOM.modal.classList.remove('active');
+        if (e.target === DOM.scoreModal) DOM.scoreModal.classList.remove('active');
+        if (e.target === DOM.authModal) DOM.authModal.classList.remove('active');
     });
 
     DOM.form.addEventListener('submit', handleFormSubmit);
     DOM.searchInput.addEventListener('input', (e) => updateUI(e.target.value));
 }
 
+// User & Auth Functions
+async function checkUser() {
+    const { data: { user } } = await _supabase.auth.getUser();
+    currentUser = user;
+    updateAuthUI();
+}
+
+function updateAuthUI() {
+    if (currentUser) {
+        const name = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+        DOM.userDisplayName.textContent = `Hi, ${name}`;
+        DOM.authBtn.textContent = 'Logout';
+        DOM.addBtn.style.display = 'block';
+    } else {
+        DOM.userDisplayName.textContent = '';
+        DOM.authBtn.textContent = 'Login';
+        DOM.addBtn.style.display = 'none';
+    }
+}
+
+function handleAuthAction() {
+    if (currentUser) {
+        _supabase.auth.signOut().then(() => {
+            currentUser = null;
+            updateAuthUI();
+            location.reload(); // Refresh to update view
+        });
+    } else {
+        DOM.authModal.classList.add('active');
+    }
+}
+
+function setAuthMode(login) {
+    isLoginMode = login;
+    DOM.toggleLogin.classList.toggle('active', login);
+    DOM.toggleSignup.classList.toggle('active', !login);
+    DOM.authModalTitle.textContent = login ? 'Welcome Back' : 'Create Account';
+    DOM.authSubmitBtn.textContent = login ? 'Login' : 'Sign Up';
+    DOM.signupNameGroup.style.display = login ? 'none' : 'block';
+}
+
+async function handleAuthSubmit(e) {
+    e.preventDefault();
+    const email = document.getElementById('auth-email').value;
+    const password = document.getElementById('auth-password').value;
+    const displayName = document.getElementById('signup-name').value;
+
+    try {
+        let result;
+        if (isLoginMode) {
+            result = await _supabase.auth.signInWithPassword({ email, password });
+        } else {
+            result = await _supabase.auth.signUp({
+                email,
+                password,
+                options: { data: { display_name: displayName } }
+            });
+        }
+
+        if (result.error) throw result.error;
+
+        currentUser = result.data.user;
+        updateAuthUI();
+        DOM.authModal.classList.remove('active');
+        DOM.authForm.reset();
+
+        if (!isLoginMode) alert('Check your email for a confirmation link!');
+    } catch (error) {
+        alert(error.message);
+    }
+}
+
+// Game Functions
 async function fetchGames() {
     try {
         const { data, error } = await _supabase
@@ -62,12 +160,17 @@ async function fetchGames() {
 
 async function handleFormSubmit(e) {
     e.preventDefault();
+    if (!currentUser) {
+        alert('Please login to submit scores');
+        return;
+    }
 
     const entryData = {
         game: document.getElementById('game-name').value,
         winner: document.getElementById('player-name').value,
         score: parseInt(document.getElementById('score').value),
-        date: document.getElementById('game-date').value
+        date: document.getElementById('game-date').value,
+        user_id: currentUser.id // track who added it
     };
 
     try {
@@ -93,15 +196,16 @@ async function handleFormSubmit(e) {
         }
 
         updateUI();
-        DOM.modal.classList.remove('active');
+        DOM.scoreModal.classList.remove('active');
         DOM.form.reset();
     } catch (error) {
-        console.error('Error saving to Supabase:', error.message);
-        alert('Failed to save score. Please check your Supabase table settings.');
+        console.error('Error saving:', error.message);
+        alert('Error saving. Make sure your table has a user_id column!');
     }
 }
 
 async function deleteGame(id) {
+    if (!currentUser) return;
     if (confirm('Are you sure you want to delete this game record?')) {
         try {
             const { error } = await _supabase
@@ -113,12 +217,13 @@ async function deleteGame(id) {
             games = games.filter(g => g.id !== id);
             updateUI();
         } catch (error) {
-            console.error('Error deleting from Supabase:', error.message);
+            console.error('Error deleting:', error.message);
         }
     }
 }
 
 function editGame(id) {
+    if (!currentUser) return;
     const game = games.find(g => g.id === id);
     if (!game) return;
 
@@ -132,7 +237,7 @@ function editGame(id) {
     document.getElementById('score').value = game.score;
     document.getElementById('game-date').value = game.date;
 
-    DOM.modal.classList.add('active');
+    DOM.scoreModal.classList.add('active');
 }
 
 function updateUI(searchTerm = '') {
@@ -183,10 +288,12 @@ function renderRecentGames(data = games) {
                 <span>+${g.score} pts</span>
                 <span>${new Date(g.date).toLocaleDateString()}</span>
             </div>
+            ${currentUser ? `
             <div class="game-actions">
                 <button class="btn-action" onclick="editGame(${g.id})">Edit</button>
                 <button class="btn-action btn-delete" onclick="deleteGame(${g.id})">Delete</button>
             </div>
+            ` : ''}
         </div>
     `).join('');
 }
@@ -194,7 +301,6 @@ function renderRecentGames(data = games) {
 function updateStats() {
     DOM.totalGames.textContent = games.length;
 
-    // Top Player
     const standings = {};
     games.forEach(g => {
         standings[g.winner] = (standings[g.winner] || 0) + g.score;
@@ -202,7 +308,6 @@ function updateStats() {
     const sorted = Object.entries(standings).sort((a, b) => b[1] - a[1]);
     DOM.topPlayer.textContent = sorted.length > 0 ? sorted[0][0] : '-';
 
-    // Most Played
     const counts = {};
     games.forEach(g => {
         counts[g.game] = (counts[g.game] || 0) + 1;
