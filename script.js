@@ -226,7 +226,7 @@ async function handleFormSubmit(e) {
         DOM.form.reset();
     } catch (error) {
         console.error('Error saving:', error.message);
-        alert('Error saving. Make sure you have created a "proofs" bucket in Supabase Storage and added a screenshot_url column to your table!');
+        alert('Error saving: ' + error.message);
     } finally {
         DOM.submitBtn.textContent = 'Save Result';
         DOM.submitBtn.disabled = false;
