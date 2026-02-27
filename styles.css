@@ -41,7 +41,8 @@ header {
     align-items: center;
     margin-bottom: 3rem;
     gap: 2rem;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    /* Keep on one line */
 }
 
 .header-right {
@@ -50,6 +51,12 @@ header {
     gap: 1.5rem;
     flex-grow: 1;
     justify-content: flex-end;
+}
+
+.user-info-section {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
 }
 
 .user-info {
@@ -86,7 +93,9 @@ header {
 .search-container {
     position: relative;
     flex-grow: 1;
-    max-width: 400px;
+    /* Fill available space */
+    max-width: none;
+    /* remove arbitrary max-width */
 }
 
 .search-container input {
@@ -152,6 +161,8 @@ h1 span {
     cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 10px 15px -3px rgba(139, 92, 246, 0.3);
+    white-space: nowrap;
+    width: max-content;
 }
 
 .btn-primary:hover {
@@ -339,7 +350,17 @@ tr:hover td {
     padding: 2rem;
     border-radius: 28px;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    max-height: 90vh;
+    /* Prevent modal from exceeding screen height */
+    overflow-y: auto;
+    /* Allow scrolling within the modal if necessary */
 }
+
+.image-modal-content {
+    max-width: 800px;
+    /* Allow image modal to be wider */
+}
+
 
 .modal-header {
     display: flex;

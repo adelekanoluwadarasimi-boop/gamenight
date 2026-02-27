@@ -32,8 +32,14 @@ const DOM = {
     toggleSignup: document.getElementById('toggle-signup'),
     signupNameGroup: document.getElementById('signup-name-group'),
     userDisplayName: document.getElementById('user-display-name'),
-    proofInput: document.getElementById('game-proof')
+    proofInput: document.getElementById('game-proof'),
+    // Image Modal
+    imageModal: document.getElementById('image-viewer-modal'),
+    imageModalFullSize: document.getElementById('proof-image-full')
 };
+
+// Admin email
+const ADMIN_EMAIL = 'adelekanoluwadarasimi@gmail.com';
 
 // Initialize App
 async function init() {
@@ -59,12 +65,14 @@ async function init() {
         btn.addEventListener('click', () => {
             DOM.scoreModal.classList.remove('active');
             DOM.authModal.classList.remove('active');
+            DOM.imageModal.classList.remove('active');
         });
     });
 
     window.addEventListener('click', (e) => {
         if (e.target === DOM.scoreModal) DOM.scoreModal.classList.remove('active');
         if (e.target === DOM.authModal) DOM.authModal.classList.remove('active');
+        if (e.target === DOM.imageModal) DOM.imageModal.classList.remove('active');
     });
 
     DOM.form.addEventListener('submit', handleFormSubmit);
@@ -143,6 +151,12 @@ async function handleAuthSubmit(e) {
     }
 }
 
+// Image Viewer Logic
+window.openImageModal = function (url) {
+    DOM.imageModalFullSize.src = url;
+    DOM.imageModal.classList.add('active');
+}
+
 // Game Functions
 async function fetchGames() {
     try {
@@ -191,9 +205,11 @@ async function handleFormSubmit(e) {
             screenshot_url = urlData.publicUrl;
         }
 
+        const winnerName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+
         const entryData = {
             game: document.getElementById('game-name').value,
-            winner: document.getElementById('player-name').value,
+            winner: winnerName,
             score: parseInt(document.getElementById('score').value),
             date: document.getElementById('game-date').value,
             user_id: currentUser.id,
@@ -262,7 +278,6 @@ function editGame(id) {
 
     DOM.entryId.value = game.id;
     document.getElementById('game-name').value = game.game;
-    document.getElementById('player-name').value = game.winner;
     document.getElementById('score').value = game.score;
     document.getElementById('game-date').value = game.date;
 
@@ -320,12 +335,12 @@ function renderRecentGames(data = games) {
             </div>
             ${g.screenshot_url ? `
             <div class="game-proof" style="margin-top: 10px;">
-                <a href="${g.screenshot_url}" target="_blank" style="color: var(--accent); font-size: 0.8rem; text-decoration: none; display: flex; align-items: center; gap: 5px;">
+                <a href="#" onclick="openImageModal('${g.screenshot_url}'); return false;" style="color: var(--accent); font-size: 0.8rem; text-decoration: none; display: flex; align-items: center; gap: 5px;">
                     🖼️ View Proof Screenshot
                 </a>
             </div>
             ` : ''}
-            ${currentUser ? `
+            ${(currentUser && (g.user_id === currentUser.id || currentUser.email === ADMIN_EMAIL)) ? `
             <div class="game-actions">
                 <button class="btn-action" onclick="editGame(${g.id})">Edit</button>
                 <button class="btn-action btn-delete" onclick="deleteGame(${g.id})">Delete</button>

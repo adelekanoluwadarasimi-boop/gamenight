@@ -23,15 +23,17 @@
                 <h1>GameNight<span>Leaderboard</span></h1>
             </div>
             <div class="header-right">
+                <div class="user-info-section">
+                    <div id="user-section" class="user-info">
+                        <span id="user-display-name"></span>
+                        <button id="auth-btn" class="btn-secondary">Login</button>
+                    </div>
+                </div>
                 <div class="search-container">
                     <input type="text" id="search-input" placeholder="Search games or players...">
                     <span class="search-icon">🔍</span>
                 </div>
-                <div id="user-section" class="user-info">
-                    <span id="user-display-name"></span>
-                    <button id="auth-btn" class="btn-secondary">Login</button>
-                </div>
-                <button id="add-score-btn" class="btn-primary" style="display: none;">Add New Score</button>
+                <button id="add-score-btn" class="btn-primary" style="display: none;">+ New Score</button>
             </div>
         </header>
 
@@ -104,10 +106,6 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="player-name">Winner Name</label>
-                    <input type="text" id="player-name" placeholder="Enter friend's name" required>
-                </div>
-                <div class="form-group">
                     <label for="score">Score / Points</label>
                     <input type="number" id="score" placeholder="Points awarded" required>
                 </div>
@@ -151,6 +149,20 @@
                 </div>
                 <button type="submit" id="auth-submit-btn" class="btn-submit">Login</button>
             </form>
+        </div>
+    </div>
+
+    <!-- Image Viewer Modal -->
+    <div id="image-viewer-modal" class="modal">
+        <div class="modal-content image-modal-content">
+            <div class="modal-header">
+                <h2 id="image-viewer-title">Proof Screenshot</h2>
+                <button class="close-btn close-viewer-btn">&times;</button>
+            </div>
+            <div class="image-viewer-body">
+                <img id="proof-image-full" src="" alt="Proof Screenshot"
+                    style="max-width: 100%; height: auto; border-radius: 8px;">
+            </div>
         </div>
     </div>
 
