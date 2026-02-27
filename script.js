@@ -35,7 +35,13 @@ const DOM = {
     proofInput: document.getElementById('game-proof'),
     // Image Modal
     imageModal: document.getElementById('image-viewer-modal'),
-    imageModalFullSize: document.getElementById('proof-image-full')
+    imageModalFullSize: document.getElementById('proof-image-full'),
+    // Mobile Elements
+    mobileNav: document.getElementById('mobile-nav'),
+    standingsList: document.getElementById('standings-list'),
+    navHome: document.getElementById('nav-home'),
+    navAddMobile: document.getElementById('nav-add-mobile'),
+    navAuthMobile: document.getElementById('nav-auth-mobile')
 };
 
 // Admin email
@@ -77,6 +83,24 @@ async function init() {
 
     DOM.form.addEventListener('submit', handleFormSubmit);
     DOM.searchInput.addEventListener('input', (e) => updateUI(e.target.value));
+
+    // Mobile Nav Listeners
+    DOM.navHome.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setActiveNavItem(DOM.navHome);
+    });
+
+    DOM.navAddMobile.addEventListener('click', () => {
+        if (!currentUser) return handleAuthAction();
+        DOM.addBtn.click();
+    });
+
+    DOM.navAuthMobile.addEventListener('click', handleAuthAction);
+}
+
+function setActiveNavItem(item) {
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    item.classList.add('active');
 }
 
 // User & Auth Functions
@@ -92,10 +116,16 @@ function updateAuthUI() {
         DOM.userDisplayName.textContent = `Hi, ${name}`;
         DOM.authBtn.textContent = 'Logout';
         DOM.addBtn.style.display = 'block';
+        DOM.mobileNav.style.display = 'flex';
+        DOM.navAddMobile.style.display = 'flex';
+        document.querySelector('#nav-auth-mobile .nav-label').textContent = name;
     } else {
         DOM.userDisplayName.textContent = '';
         DOM.authBtn.textContent = 'Login';
         DOM.addBtn.style.display = 'none';
+        DOM.mobileNav.style.display = 'flex'; // Keep home/auth on mobile always
+        DOM.navAddMobile.style.display = 'none';
+        document.querySelector('#nav-auth-mobile .nav-label').textContent = 'Login';
     }
 }
 
@@ -318,6 +348,21 @@ function renderLeaderboard(data = games) {
             <td>${player.totalScore.toLocaleString()}</td>
             <td>${((player.games / (games.length || 1)) * 100).toFixed(0)}%</td>
         </tr>
+    `).join('');
+
+    // Render mobile cards
+    DOM.standingsList.innerHTML = sortedPlayers.map((player, index) => `
+        <div class="standings-mobile-card rank-${index + 1}">
+            <div class="mobile-rank">${index + 1}</div>
+            <div class="mobile-info">
+                <span class="mobile-name">${player.name}</span>
+                <span class="mobile-stats">${player.games} games • ${((player.games / (games.length || 1)) * 100).toFixed(0)}% win rate</span>
+            </div>
+            <div class="mobile-score">
+                ${player.totalScore.toLocaleString()}
+                <div style="font-size: 0.6rem; color: var(--text-muted);">POINTS</div>
+            </div>
+        </div>
     `).join('');
 }
 

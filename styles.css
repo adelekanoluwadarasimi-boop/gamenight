@@ -468,11 +468,122 @@ select option {
 }
 
 .game-actions {
-    display: flex;
-    gap: 0.5rem;
-    margin-top: 1rem;
-    padding-top: 1rem;
     border-top: 1px solid var(--glass-border);
+}
+
+/* Mobile Standings Card */
+.standings-list {
+    display: none;
+    /* Desktop hidden */
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.standings-mobile-card {
+    background: var(--bg-card);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    padding: 1.25rem;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.mobile-rank {
+    width: 40px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-family: 'Outfit', sans-serif;
+}
+
+.mobile-info {
+    flex-grow: 1;
+}
+
+.mobile-name {
+    font-weight: 600;
+    display: block;
+}
+
+.mobile-stats {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.mobile-score {
+    text-align: right;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    color: var(--accent);
+}
+
+/* Mobile Navigation Bar */
+.mobile-nav {
+    display: none;
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+    padding: 0.5rem;
+    border-radius: 24px;
+    z-index: 2000;
+    justify-content: space-around;
+    align-items: center;
+    width: 280px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+}
+
+.nav-item {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    cursor: pointer;
+    padding: 0.5rem 1rem;
+    border-radius: 16px;
+    transition: all 0.3s;
+}
+
+.nav-item.active {
+    color: var(--primary);
+    background: rgba(139, 92, 246, 0.1);
+}
+
+.nav-icon {
+    font-size: 1.2rem;
+}
+
+.nav-label {
+    font-size: 0.6rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.nav-add {
+    background: var(--primary);
+    color: white;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    font-size: 1.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: -30px;
+    border: 4px solid var(--bg-dark);
+    box-shadow: 0 10px 20px rgba(139, 92, 246, 0.4);
 }
 
 .btn-action {
@@ -498,17 +609,59 @@ select option {
     color: #ef4444;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
+    body {
+        padding: 1rem 0.5rem 6rem 0.5rem;
+        /* Space for bottom nav */
+    }
+
+    header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .header-right {
+        width: 100%;
+        gap: 0.5rem;
+    }
+
+    /* Hide desktop specific elements */
+    .user-info-section,
+    #add-score-btn,
+    .leaderboard-card table {
+        display: none !important;
+    }
+
+    .leaderboard-card {
+        background: none;
+        border: none;
+    }
+
+    /* Show mobile elements */
+    .mobile-nav {
+        display: flex;
+    }
+
+    .standings-list {
+        display: flex;
+    }
+
+    .search-container {
+        max-width: none;
+    }
+
     .stats-overview {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 0.75rem;
     }
 
-    table {
-        font-size: 0.875rem;
+    .stat-card {
+        padding: 1rem;
     }
 
-    td,
-    th {
-        padding: 1rem 0.75rem;
+    .stat-value {
+        font-size: 1.2rem;
     }
 }
