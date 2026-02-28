@@ -8,35 +8,45 @@ let isEditing = false;
 let currentUser = null;
 let isLoginMode = true;
 
-const DOM = {
-    addBtn: document.getElementById('add-score-btn'),
-    scoreModal: document.getElementById('score-modal'),
-    modalTitle: document.getElementById('modal-title'),
-    closeBtns: document.querySelectorAll('.close-btn'),
-    form: document.getElementById('add-score-form'),
-    entryId: document.getElementById('entry-id'),
-    leaderboardBody: document.getElementById('leaderboard-body'),
-    gamesList: document.getElementById('games-list'),
-    totalGames: document.getElementById('total-games'),
-    topPlayer: document.getElementById('top-player'),
-    mostPlayed: document.getElementById('most-played'),
-    submitBtn: document.querySelector('.btn-submit'),
-    searchInput: document.getElementById('search-input'),
-    // Auth elements
-    authBtn: document.getElementById('auth-btn'),
-    authModal: document.getElementById('auth-modal'),
-    authForm: document.getElementById('auth-form'),
-    authModalTitle: document.getElementById('auth-modal-title'),
-    authSubmitBtn: document.getElementById('auth-submit-btn'),
-    toggleLogin: document.getElementById('toggle-login'),
-    toggleSignup: document.getElementById('toggle-signup'),
-    signupNameGroup: document.getElementById('signup-name-group'),
-    userDisplayName: document.getElementById('user-display-name'),
-    proofInput: document.getElementById('game-proof'),
-    // Image Modal
-    imageModal: document.getElementById('image-viewer-modal'),
-    imageModalFullSize: document.getElementById('proof-image-full')
+const appDOM = {
+    get addBtn() { return document.getElementById('add-score-btn'); },
+    get scoreModal() { return document.getElementById('score-modal'); },
+    get modalTitle() { return document.getElementById('modal-title'); },
+    get closeBtns() { return document.querySelectorAll('.close-btn'); },
+    get form() { return document.getElementById('add-score-form'); },
+    get entryId() { return document.getElementById('entry-id'); },
+    get leaderboardBody() { return document.getElementById('leaderboard-body'); },
+    get gamesList() { return document.getElementById('games-list'); },
+    get totalGames() { return document.getElementById('total-games'); },
+    get topPlayer() { return document.getElementById('top-player'); },
+    get mostPlayed() { return document.getElementById('most-played'); },
+    get submitBtn() { return document.querySelector('.btn-submit'); },
+    get searchInput() { return document.getElementById('search-input'); },
+    get authBtn() { return document.getElementById('auth-btn'); },
+    get authModal() { return document.getElementById('auth-modal'); },
+    get authForm() { return document.getElementById('auth-form'); },
+    get authModalTitle() { return document.getElementById('auth-modal-title'); },
+    get authSubmitBtn() { return document.getElementById('auth-submit-btn'); },
+    get toggleLogin() { return document.getElementById('toggle-login'); },
+    get toggleSignup() { return document.getElementById('toggle-signup'); },
+    get signupNameGroup() { return document.getElementById('signup-name-group'); },
+    get userDisplayName() { return document.getElementById('user-display-name'); },
+    get proofInput() { return document.getElementById('game-proof'); },
+    get imageModal() { return document.getElementById('image-viewer-modal'); },
+    get imageModalFullSize() { return document.getElementById('proof-image-full'); },
+    get standingsList() { return document.getElementById('standings-list'); }
 };
+
+// Safety utilities
+function safeSetHTML(el, html) {
+    if (el) el.innerHTML = html;
+    else console.warn('Missing element for innerHTML');
+}
+
+function safeSetText(el, text) {
+    if (el) el.textContent = text;
+    else console.warn('Missing element for textContent');
+}
 
 // Admin email
 const ADMIN_EMAIL = 'adelekanoluwadarasimi@gmail.com';
@@ -47,36 +57,36 @@ async function init() {
     await fetchGames();
 
     // Event Listeners
-    DOM.addBtn.addEventListener('click', () => {
+    appDOM.addBtn?.addEventListener('click', () => {
         isEditing = false;
-        DOM.modalTitle.textContent = 'Record a Game';
-        DOM.submitBtn.textContent = 'Save Result';
-        DOM.form.reset();
-        DOM.entryId.value = '';
-        DOM.scoreModal.classList.add('active');
+        safeSetText(appDOM.modalTitle, 'Record a Game');
+        safeSetText(appDOM.submitBtn, 'Save Result');
+        appDOM.form.reset();
+        appDOM.entryId.value = '';
+        appDOM.scoreModal.classList.add('active');
     });
 
-    DOM.authBtn.addEventListener('click', handleAuthAction);
-    DOM.toggleLogin.addEventListener('click', () => setAuthMode(true));
-    DOM.toggleSignup.addEventListener('click', () => setAuthMode(false));
-    DOM.authForm.addEventListener('submit', handleAuthSubmit);
+    appDOM.authBtn?.addEventListener('click', handleAuthAction);
+    appDOM.toggleLogin?.addEventListener('click', () => setAuthMode(true));
+    appDOM.toggleSignup?.addEventListener('click', () => setAuthMode(false));
+    appDOM.authForm?.addEventListener('submit', handleAuthSubmit);
 
-    DOM.closeBtns.forEach(btn => {
+    appDOM.closeBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-            DOM.scoreModal.classList.remove('active');
-            DOM.authModal.classList.remove('active');
-            DOM.imageModal.classList.remove('active');
+            appDOM.scoreModal.classList.remove('active');
+            appDOM.authModal.classList.remove('active');
+            appDOM.imageModal.classList.remove('active');
         });
     });
 
     window.addEventListener('click', (e) => {
-        if (e.target === DOM.scoreModal) DOM.scoreModal.classList.remove('active');
-        if (e.target === DOM.authModal) DOM.authModal.classList.remove('active');
-        if (e.target === DOM.imageModal) DOM.imageModal.classList.remove('active');
+        if (e.target === appDOM.scoreModal) appDOM.scoreModal.classList.remove('active');
+        if (e.target === appDOM.authModal) appDOM.authModal.classList.remove('active');
+        if (e.target === appDOM.imageModal) appDOM.imageModal.classList.remove('active');
     });
 
-    DOM.form.addEventListener('submit', handleFormSubmit);
-    DOM.searchInput.addEventListener('input', (e) => updateUI(e.target.value));
+    appDOM.form?.addEventListener('submit', handleFormSubmit);
+    appDOM.searchInput?.addEventListener('input', (e) => updateUI(e.target.value));
 }
 
 // User & Auth Functions
@@ -89,13 +99,13 @@ async function checkUser() {
 function updateAuthUI() {
     if (currentUser) {
         const name = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
-        DOM.userDisplayName.textContent = `Hi, ${name}`;
-        DOM.authBtn.textContent = 'Logout';
-        DOM.addBtn.style.display = 'block';
+        safeSetText(appDOM.userDisplayName, `Hi, ${name}`);
+        safeSetText(appDOM.authBtn, 'Logout');
+        if (appDOM.addBtn) appDOM.addBtn.style.display = 'block';
     } else {
-        DOM.userDisplayName.textContent = '';
-        DOM.authBtn.textContent = 'Login';
-        DOM.addBtn.style.display = 'none';
+        safeSetText(appDOM.userDisplayName, '');
+        safeSetText(appDOM.authBtn, 'Login');
+        if (appDOM.addBtn) appDOM.addBtn.style.display = 'none';
     }
 }
 
@@ -107,17 +117,17 @@ function handleAuthAction() {
             location.reload(); // Refresh to update view
         });
     } else {
-        DOM.authModal.classList.add('active');
+        appDOM.authModal?.classList.add('active');
     }
 }
 
 function setAuthMode(login) {
     isLoginMode = login;
-    DOM.toggleLogin.classList.toggle('active', login);
-    DOM.toggleSignup.classList.toggle('active', !login);
-    DOM.authModalTitle.textContent = login ? 'Welcome Back' : 'Create Account';
-    DOM.authSubmitBtn.textContent = login ? 'Login' : 'Sign Up';
-    DOM.signupNameGroup.style.display = login ? 'none' : 'block';
+    appDOM.toggleLogin?.classList.toggle('active', login);
+    appDOM.toggleSignup?.classList.toggle('active', !login);
+    safeSetText(appDOM.authModalTitle, login ? 'Welcome Back' : 'Create Account');
+    safeSetText(appDOM.authSubmitBtn, login ? 'Login' : 'Sign Up');
+    if (appDOM.signupNameGroup) appDOM.signupNameGroup.style.display = login ? 'none' : 'block';
 }
 
 async function handleAuthSubmit(e) {
@@ -142,8 +152,8 @@ async function handleAuthSubmit(e) {
 
         currentUser = result.data.user;
         updateAuthUI();
-        DOM.authModal.classList.remove('active');
-        DOM.authForm.reset();
+        appDOM.authModal?.classList.remove('active');
+        appDOM.authForm?.reset();
 
         if (!isLoginMode) alert('Check your email for a confirmation link!');
     } catch (error) {
@@ -153,8 +163,8 @@ async function handleAuthSubmit(e) {
 
 // Image Viewer Logic
 window.openImageModal = function (url) {
-    DOM.imageModalFullSize.src = url;
-    DOM.imageModal.classList.add('active');
+    if (appDOM.imageModalFullSize) appDOM.imageModalFullSize.src = url;
+    appDOM.imageModal?.classList.add('active');
 }
 
 // Game Functions
@@ -180,12 +190,12 @@ async function handleFormSubmit(e) {
         return;
     }
 
-    DOM.submitBtn.textContent = 'Uploading Proof...';
-    DOM.submitBtn.disabled = true;
+    safeSetText(appDOM.submitBtn, 'Uploading Proof...');
+    if (appDOM.submitBtn) appDOM.submitBtn.disabled = true;
 
     try {
         let screenshot_url = '';
-        const file = DOM.proofInput.files[0];
+        const file = appDOM.proofInput?.files[0];
 
         if (file) {
             const fileExt = file.name.split('.').pop();
@@ -217,7 +227,7 @@ async function handleFormSubmit(e) {
         };
 
         if (isEditing) {
-            const id = parseInt(DOM.entryId.value);
+            const id = parseInt(appDOM.entryId?.value);
             const { data, error } = await _supabase
                 .from('games')
                 .update(entryData)
@@ -238,14 +248,14 @@ async function handleFormSubmit(e) {
         }
 
         updateUI();
-        DOM.scoreModal.classList.remove('active');
-        DOM.form.reset();
+        appDOM.scoreModal?.classList.remove('active');
+        appDOM.form?.reset();
     } catch (error) {
         console.error('Error saving:', error.message);
         alert('Error saving: ' + error.message);
     } finally {
-        DOM.submitBtn.textContent = 'Save Result';
-        DOM.submitBtn.disabled = false;
+        safeSetText(appDOM.submitBtn, 'Save Result');
+        if (appDOM.submitBtn) appDOM.submitBtn.disabled = false;
     }
 }
 
@@ -273,16 +283,16 @@ function editGame(id) {
     if (!game) return;
 
     isEditing = true;
-    DOM.modalTitle.textContent = 'Edit Game Record';
-    DOM.submitBtn.textContent = 'Update Result';
+    safeSetText(appDOM.modalTitle, 'Edit Game Record');
+    safeSetText(appDOM.submitBtn, 'Update Result');
 
-    DOM.entryId.value = game.id;
+    if (appDOM.entryId) appDOM.entryId.value = game.id;
     document.getElementById('game-name').value = game.game;
     document.getElementById('score').value = game.score;
     document.getElementById('game-date').value = game.date;
 
     // Screenshot editing is not supported in this simple version
-    DOM.scoreModal.classList.add('active');
+    appDOM.scoreModal?.classList.add('active');
 }
 
 function updateUI(searchTerm = '') {
@@ -310,7 +320,7 @@ function renderLeaderboard(data = games) {
 
     const sortedPlayers = Object.values(standings).sort((a, b) => b.totalScore - a.totalScore);
 
-    DOM.leaderboardBody.innerHTML = sortedPlayers.map((player, index) => `
+    safeSetHTML(appDOM.leaderboardBody, sortedPlayers.map((player, index) => `
         <tr class="rank-${index + 1}">
             <td><div class="rank-pill">${index + 1}</div></td>
             <td><strong>${player.name}</strong></td>
@@ -318,10 +328,10 @@ function renderLeaderboard(data = games) {
             <td>${player.totalScore.toLocaleString()}</td>
             <td>${((player.games / (games.length || 1)) * 100).toFixed(0)}%</td>
         </tr>
-    `).join('');
+    `).join(''));
 
     // Render mobile cards
-    DOM.standingsList.innerHTML = sortedPlayers.map((player, index) => `
+    safeSetHTML(appDOM.standingsList, sortedPlayers.map((player, index) => `
         <div class="standings-mobile-card rank-${index + 1}">
             <div class="mobile-rank">${index + 1}</div>
             <div class="mobile-info">
@@ -333,11 +343,11 @@ function renderLeaderboard(data = games) {
                 <div style="font-size: 0.6rem; color: var(--text-muted);">POINTS</div>
             </div>
         </div>
-    `).join('');
+    `).join(''));
 }
 
 function renderRecentGames(data = games) {
-    DOM.gamesList.innerHTML = data.slice(0, 12).map(g => `
+    safeSetHTML(appDOM.gamesList, data.slice(0, 12).map(g => `
         <div class="game-card">
             <div class="game-title">${g.game}</div>
             <div class="game-winner">
@@ -362,25 +372,25 @@ function renderRecentGames(data = games) {
             </div>
             ` : ''}
         </div>
-    `).join('');
+    `).join(''));
 }
 
 function updateStats() {
-    DOM.totalGames.textContent = games.length;
+    safeSetText(appDOM.totalGames, games.length);
 
     const standings = {};
     games.forEach(g => {
         standings[g.winner] = (standings[g.winner] || 0) + g.score;
     });
     const sorted = Object.entries(standings).sort((a, b) => b[1] - a[1]);
-    DOM.topPlayer.textContent = sorted.length > 0 ? sorted[0][0] : '-';
+    safeSetText(appDOM.topPlayer, sorted.length > 0 ? sorted[0][0] : '-');
 
     const counts = {};
     games.forEach(g => {
         counts[g.game] = (counts[g.game] || 0) + 1;
     });
     const most = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-    DOM.mostPlayed.textContent = most.length > 0 ? most[0][0] : '-';
+    safeSetText(appDOM.mostPlayed, most.length > 0 ? most[0][0] : '-');
 }
 
 init();
