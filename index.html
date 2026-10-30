@@ -20,7 +20,10 @@
         <header>
             <div class="logo">
                 <div class="logo-icon">🏆</div>
-                <h1>GameNight<span>Leaderboard</span></h1>
+                <div>
+                    <h1>GameNight<span>Leaderboard</span></h1>
+                    <div id="backend-status-badge" class="badge-status">⚡ Local Mode</div>
+                </div>
             </div>
             <div class="header-right">
                 <div class="user-info-section">
@@ -81,6 +84,7 @@
             <section class="recent-history">
                 <div class="section-header">
                     <h2>Recent Games</h2>
+                    <button id="reset-games-btn" class="btn-secondary" style="display: none; border-color: rgba(239, 68, 68, 0.6); color: #ef4444; font-size: 0.75rem; padding: 0.35rem 0.75rem;">🗑️ Clear All Scores</button>
                 </div>
                 <div id="games-list" class="games-grid">
                     <!-- Populated by JS -->
@@ -106,7 +110,12 @@
                         <option value="Whot">Whot</option>
                         <option value="Jujutsu Infinite">Jujutsu Infinite</option>
                         <option value="Shadow Boxing">Shadow Boxing</option>
+                        <option value="Other">Other (Custom Game)</option>
                     </select>
+                </div>
+                <div class="form-group" id="custom-game-group" style="display: none;">
+                    <label for="custom-game-name">Custom Game Name</label>
+                    <input type="text" id="custom-game-name" placeholder="Enter game title">
                 </div>
                 <div class="form-group">
                     <label for="score">Score / Points</label>
@@ -118,8 +127,8 @@
                 </div>
                 <div class="form-group">
                     <label for="game-proof">Proof Screenshot (Anti-Cheat)</label>
-                    <input type="file" id="game-proof" accept="image/*" required>
-                    <small style="color: var(--text-muted); font-size: 0.7rem;">Upload a screenshot of your win.</small>
+                    <input type="file" id="game-proof" accept="image/*">
+                    <small style="color: var(--text-muted); font-size: 0.7rem;">Upload a screenshot of your win (optional).</small>
                 </div>
                 <button type="submit" class="btn-submit">Save Result</button>
             </form>

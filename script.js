@@ -1,12 +1,21 @@
 // Supabase Configuration
 const SUPABASE_URL = 'https://mqkniqvfntchiatzlsla.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1xa25pcXZmbnRjaGlhdHpsc2xhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE4NTYyMDksImV4cCI6MjA4NzQzMjIwOX0.YTNzrrHflQ2ymYNGYYDKAaVUrNwafXw9EN1qNT2guyA';
-const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let _supabase = null;
+try {
+    if (typeof supabase !== 'undefined' && SUPABASE_URL && SUPABASE_KEY) {
+        _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    }
+} catch (e) {
+    console.warn('Supabase initialization failed:', e);
+}
 
 let games = [];
 let isEditing = false;
 let currentUser = null;
 let isLoginMode = true;
+let isLocalMode = false;
 
 const appDOM = {
     get addBtn() { return document.getElementById('add-score-btn'); },
@@ -34,7 +43,12 @@ const appDOM = {
     get proofInput() { return document.getElementById('game-proof'); },
     get imageModal() { return document.getElementById('image-viewer-modal'); },
     get imageModalFullSize() { return document.getElementById('proof-image-full'); },
-    get standingsList() { return document.getElementById('standings-list'); }
+    get standingsList() { return document.getElementById('standings-list'); },
+    get statusBadge() { return document.getElementById('backend-status-badge'); },
+    get gameNameSelect() { return document.getElementById('game-name'); },
+    get customGameGroup() { return document.getElementById('custom-game-group'); },
+    get customGameName() { return document.getElementById('custom-game-name'); },
+    get resetGamesBtn() { return document.getElementById('reset-games-btn'); }
 };
 
 // Safety utilities
@@ -51,19 +65,47 @@ function safeSetText(el, text) {
 // Admin email
 const ADMIN_EMAIL = 'adelekanoluwadarasimi@gmail.com';
 
+function isAdmin() {
+    return currentUser && currentUser.email && currentUser.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+}
+
+function updateModeIndicator() {
+    if (!appDOM.statusBadge) return;
+    if (isLocalMode) {
+        appDOM.statusBadge.textContent = '⚡ Local Tournament Mode';
+        appDOM.statusBadge.className = 'badge-status';
+        appDOM.statusBadge.title = 'Scores are stored locally on this device. (Supabase cloud offline or unconfigured)';
+    } else {
+        appDOM.statusBadge.textContent = '🟢 Cloud Connected';
+        appDOM.statusBadge.className = 'badge-status cloud';
+        appDOM.statusBadge.title = 'Connected to Supabase cloud database.';
+    }
+}
+
 // Initialize App
 async function init() {
+    // Custom game input toggle
+    appDOM.gameNameSelect?.addEventListener('change', (e) => {
+        if (appDOM.customGameGroup) {
+            appDOM.customGameGroup.style.display = e.target.value === 'Other' ? 'block' : 'none';
+        }
+    });
+
     await checkUser();
     await fetchGames();
+    updateModeIndicator();
 
     // Event Listeners
     appDOM.addBtn?.addEventListener('click', () => {
         isEditing = false;
         safeSetText(appDOM.modalTitle, 'Record a Game');
         safeSetText(appDOM.submitBtn, 'Save Result');
-        appDOM.form.reset();
-        appDOM.entryId.value = '';
-        appDOM.scoreModal.classList.add('active');
+        appDOM.form?.reset();
+        if (appDOM.entryId) appDOM.entryId.value = '';
+        if (appDOM.customGameGroup) appDOM.customGameGroup.style.display = 'none';
+        const dateInput = document.getElementById('game-date');
+        if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+        appDOM.scoreModal?.classList.add('active');
     });
 
     appDOM.authBtn?.addEventListener('click', handleAuthAction);
@@ -73,9 +115,9 @@ async function init() {
 
     appDOM.closeBtns.forEach(btn => {
         btn.addEventListener('click', () => {
-            appDOM.scoreModal.classList.remove('active');
-            appDOM.authModal.classList.remove('active');
-            appDOM.imageModal.classList.remove('active');
+            appDOM.scoreModal?.classList.remove('active');
+            appDOM.authModal?.classList.remove('active');
+            appDOM.imageModal?.classList.remove('active');
         });
     });
 
@@ -87,35 +129,77 @@ async function init() {
 
     appDOM.form?.addEventListener('submit', handleFormSubmit);
     appDOM.searchInput?.addEventListener('input', (e) => updateUI(e.target.value));
+    appDOM.resetGamesBtn?.addEventListener('click', handleResetAllGames);
+
+    if (appDOM.statusBadge) {
+        appDOM.statusBadge.addEventListener('click', () => {
+            if (isLocalMode) {
+                alert("GameNight is currently running in Local Tournament Mode!\n\nAll accounts, games, scores, and screenshots are saved directly on this browser.\n\nTo share live scores across multiple devices over the internet, connect a free Supabase project by following the README instructions.");
+            } else {
+                alert("Connected to Supabase cloud! All scores are synchronized in real-time.");
+            }
+        });
+    }
 }
 
 // User & Auth Functions
 async function checkUser() {
-    const { data: { user } } = await _supabase.auth.getUser();
-    currentUser = user;
+    if (_supabase && !isLocalMode) {
+        try {
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Auth timeout')), 2500));
+            const getUserPromise = _supabase.auth.getUser();
+            const { data, error } = await Promise.race([getUserPromise, timeoutPromise]);
+            if (!error && data?.user) {
+                currentUser = data.user;
+                updateAuthUI();
+                return;
+            }
+        } catch (e) {
+            console.warn('Supabase auth unavailable; enabling Local Tournament Mode:', e.message);
+            isLocalMode = true;
+        }
+    } else {
+        isLocalMode = true;
+    }
+
+    // Check Local Storage for active session
+    const localUserJson = localStorage.getItem('gamenight_current_user');
+    if (localUserJson) {
+        try {
+            currentUser = JSON.parse(localUserJson);
+        } catch (_) {
+            currentUser = null;
+        }
+    }
     updateAuthUI();
 }
 
 function updateAuthUI() {
     if (currentUser) {
-        const name = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+        const name = currentUser.user_metadata?.display_name || currentUser.displayName || currentUser.email.split('@')[0];
         safeSetText(appDOM.userDisplayName, `Hi, ${name}`);
         safeSetText(appDOM.authBtn, 'Logout');
         if (appDOM.addBtn) appDOM.addBtn.style.display = 'block';
     } else {
         safeSetText(appDOM.userDisplayName, '');
-        safeSetText(appDOM.authBtn, 'Login');
+        safeSetText(appDOM.authBtn, 'Login / Join');
         if (appDOM.addBtn) appDOM.addBtn.style.display = 'none';
+    }
+
+    if (appDOM.resetGamesBtn) {
+        appDOM.resetGamesBtn.style.display = isAdmin() ? 'inline-block' : 'none';
     }
 }
 
 function handleAuthAction() {
     if (currentUser) {
-        _supabase.auth.signOut().then(() => {
-            currentUser = null;
-            updateAuthUI();
-            location.reload(); // Refresh to update view
-        });
+        if (!isLocalMode && _supabase) {
+            _supabase.auth.signOut().catch(() => {});
+        }
+        currentUser = null;
+        localStorage.removeItem('gamenight_current_user');
+        updateAuthUI();
+        updateUI();
     } else {
         appDOM.authModal?.classList.add('active');
     }
@@ -125,39 +209,119 @@ function setAuthMode(login) {
     isLoginMode = login;
     appDOM.toggleLogin?.classList.toggle('active', login);
     appDOM.toggleSignup?.classList.toggle('active', !login);
-    safeSetText(appDOM.authModalTitle, login ? 'Welcome Back' : 'Create Account');
+    safeSetText(appDOM.authModalTitle, login ? 'Welcome Back' : 'Create Player Account');
     safeSetText(appDOM.authSubmitBtn, login ? 'Login' : 'Sign Up');
     if (appDOM.signupNameGroup) appDOM.signupNameGroup.style.display = login ? 'none' : 'block';
 }
 
 async function handleAuthSubmit(e) {
     e.preventDefault();
-    const email = document.getElementById('auth-email').value;
+    const email = document.getElementById('auth-email').value.trim();
     const password = document.getElementById('auth-password').value;
-    const displayName = document.getElementById('signup-name').value;
+    const displayName = document.getElementById('signup-name')?.value?.trim() || email.split('@')[0];
 
+    // Try Supabase first if not in local mode
+    if (!isLocalMode && _supabase) {
+        try {
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Network timeout')), 3000));
+            let authPromise;
+            if (isLoginMode) {
+                authPromise = _supabase.auth.signInWithPassword({ email, password });
+            } else {
+                authPromise = _supabase.auth.signUp({
+                    email,
+                    password,
+                    options: { data: { display_name: displayName } }
+                });
+            }
+
+            const result = await Promise.race([authPromise, timeoutPromise]);
+            if (result.error) throw result.error;
+
+            currentUser = result.data.user;
+            updateAuthUI();
+            appDOM.authModal?.classList.remove('active');
+            appDOM.authForm?.reset();
+
+            if (!isLoginMode && !result.data.session) {
+                alert('Account created! Please check your email for confirmation if required.');
+            }
+            return;
+        } catch (error) {
+            console.warn('Supabase auth failed; switching to Local Mode:', error.message);
+            isLocalMode = true;
+            updateModeIndicator();
+            // Continue below to handle in local mode
+        }
+    }
+
+    // Local Tournament Auth Handler
     try {
-        let result;
+        let localUsers = JSON.parse(localStorage.getItem('gamenight_local_users') || '[]');
+
         if (isLoginMode) {
-            result = await _supabase.auth.signInWithPassword({ email, password });
+            const user = localUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+            if (!user) {
+                // Friendly error with option to auto-register
+                const autoRegister = confirm(`Player account "${email}" was not found.\n\nWould you like to register as a new player with this name?`);
+                if (autoRegister) {
+                    const newUser = {
+                        id: 'usr_' + Date.now(),
+                        email: email,
+                        password: password,
+                        displayName: displayName
+                    };
+                    localUsers.push(newUser);
+                    localStorage.setItem('gamenight_local_users', JSON.stringify(localUsers));
+                    currentUser = {
+                        id: newUser.id,
+                        email: newUser.email,
+                        user_metadata: { display_name: newUser.displayName }
+                    };
+                } else {
+                    return;
+                }
+            } else {
+                if (user.password && user.password !== password) {
+                    alert('Incorrect password. Please try again.');
+                    return;
+                }
+                currentUser = {
+                    id: user.id,
+                    email: user.email,
+                    user_metadata: { display_name: user.displayName }
+                };
+            }
         } else {
-            result = await _supabase.auth.signUp({
-                email,
-                password,
-                options: { data: { display_name: displayName } }
-            });
+            // Sign Up
+            const existing = localUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+            if (existing) {
+                alert('An account with this email/name already exists. Switching to Login.');
+                setAuthMode(true);
+                return;
+            }
+            const newUser = {
+                id: 'usr_' + Date.now(),
+                email: email,
+                password: password,
+                displayName: displayName
+            };
+            localUsers.push(newUser);
+            localStorage.setItem('gamenight_local_users', JSON.stringify(localUsers));
+            currentUser = {
+                id: newUser.id,
+                email: newUser.email,
+                user_metadata: { display_name: newUser.displayName }
+            };
         }
 
-        if (result.error) throw result.error;
-
-        currentUser = result.data.user;
+        localStorage.setItem('gamenight_current_user', JSON.stringify(currentUser));
         updateAuthUI();
         appDOM.authModal?.classList.remove('active');
         appDOM.authForm?.reset();
-
-        if (!isLoginMode) alert('Check your email for a confirmation link!');
-    } catch (error) {
-        alert(error.message);
+        alert(`Welcome, ${currentUser.user_metadata.display_name}! You are ready to log scores.`);
+    } catch (err) {
+        alert('Authentication error: ' + err.message);
     }
 }
 
@@ -165,32 +329,89 @@ async function handleAuthSubmit(e) {
 window.openImageModal = function (url) {
     if (appDOM.imageModalFullSize) appDOM.imageModalFullSize.src = url;
     appDOM.imageModal?.classList.add('active');
-}
+};
 
 // Game Functions
 async function fetchGames() {
-    try {
-        const { data, error } = await _supabase
-            .from('games')
-            .select('*')
-            .order('date', { ascending: false });
+    if (!isLocalMode && _supabase) {
+        try {
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Fetch timeout')), 3000));
+            const fetchPromise = _supabase.from('games').select('*').order('date', { ascending: false });
+            const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+            if (error) throw error;
+            games = data || [];
+            updateUI();
+            return;
+        } catch (error) {
+            console.warn('Error fetching from Supabase; falling back to local storage:', error.message);
+            isLocalMode = true;
+            updateModeIndicator();
+        }
+    }
 
-        if (error) throw error;
-        games = data || [];
+    // Automatically purge old sample/dummy games if present
+    if (!localStorage.getItem('gamenight_purge_samples_v2')) {
+        localStorage.removeItem('gamenight_games');
+        localStorage.setItem('gamenight_purge_samples_v2', 'true');
+    }
+
+    // Local Storage Data
+    const stored = localStorage.getItem('gamenight_games');
+    if (stored) {
+        try {
+            games = JSON.parse(stored);
+        } catch (_) {
+            games = [];
+        }
+    } else {
+        games = [];
+        localStorage.setItem('gamenight_games', JSON.stringify([]));
+    }
+    updateUI();
+}
+
+async function handleResetAllGames() {
+    if (!isAdmin()) {
+        alert('Permission Denied: Only the admin (' + ADMIN_EMAIL + ') can clear all scores.');
+        return;
+    }
+
+    const confirmed = confirm('⚠️ WARNING: Are you sure you want to delete ALL game scores?\n\nThis will reset the entire tournament and cannot be undone.');
+    if (!confirmed) return;
+
+    try {
+        if (!isLocalMode && _supabase) {
+            try {
+                const { error } = await _supabase.from('games').delete().neq('id', 0);
+                if (error) throw error;
+            } catch (e) {
+                console.warn('Supabase bulk delete warning:', e.message);
+            }
+        }
+
+        games = [];
+        localStorage.removeItem('gamenight_games');
+        localStorage.setItem('gamenight_games', JSON.stringify([]));
         updateUI();
-    } catch (error) {
-        console.error('Error fetching from Supabase:', error.message);
+        alert('All tournament scores and games have been cleared!');
+    } catch (err) {
+        alert('Error clearing scores: ' + err.message);
     }
 }
 
 async function handleFormSubmit(e) {
     e.preventDefault();
     if (!currentUser) {
-        alert('Please login to submit scores');
+        alert('Please login or join first to submit scores.');
         return;
     }
 
-    safeSetText(appDOM.submitBtn, 'Uploading Proof...');
+    if (isEditing && !isAdmin()) {
+        alert('Permission Denied: Only the tournament admin (' + ADMIN_EMAIL + ') can edit scores.');
+        return;
+    }
+
+    safeSetText(appDOM.submitBtn, 'Saving Result...');
     if (appDOM.submitBtn) appDOM.submitBtn.disabled = true;
 
     try {
@@ -198,78 +419,136 @@ async function handleFormSubmit(e) {
         const file = appDOM.proofInput?.files[0];
 
         if (file) {
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${Math.random()}.${fileExt}`;
-            const filePath = `proofs/${fileName}`;
+            // If Supabase cloud is active, upload to bucket
+            if (!isLocalMode && _supabase) {
+                try {
+                    const fileExt = file.name.split('.').pop();
+                    const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+                    const filePath = `proofs/${fileName}`;
 
-            let { error: uploadError } = await _supabase.storage
-                .from('proofs')
-                .upload(filePath, file);
+                    let { error: uploadError } = await _supabase.storage
+                        .from('proofs')
+                        .upload(filePath, file);
 
-            if (uploadError) throw uploadError;
+                    if (!uploadError) {
+                        const { data: urlData } = _supabase.storage
+                            .from('proofs')
+                            .getPublicUrl(filePath);
+                        screenshot_url = urlData.publicUrl;
+                    }
+                } catch (e) {
+                    console.warn('Storage upload failed, falling back to local image data:', e);
+                }
+            }
 
-            const { data: urlData } = _supabase.storage
-                .from('proofs')
-                .getPublicUrl(filePath);
-
-            screenshot_url = urlData.publicUrl;
+            // Convert to base64 Data URL if not uploaded to cloud
+            if (!screenshot_url) {
+                screenshot_url = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (ev) => resolve(ev.target.result);
+                    reader.onerror = () => resolve('');
+                    reader.readAsDataURL(file);
+                });
+            }
         }
 
-        const winnerName = currentUser.user_metadata.display_name || currentUser.email.split('@')[0];
+        // Determine Game Name (handle 'Other')
+        let selectedGame = appDOM.gameNameSelect ? appDOM.gameNameSelect.value : '';
+        if (selectedGame === 'Other') {
+            const customTitle = appDOM.customGameName ? appDOM.customGameName.value.trim() : '';
+            selectedGame = customTitle || 'Custom Game';
+        }
+
+        const winnerName = currentUser.user_metadata?.display_name || currentUser.displayName || currentUser.email.split('@')[0];
 
         const entryData = {
-            game: document.getElementById('game-name').value,
+            id: isEditing ? parseInt(appDOM.entryId?.value) : Date.now(),
+            game: selectedGame,
             winner: winnerName,
-            score: parseInt(document.getElementById('score').value),
+            score: parseInt(document.getElementById('score').value) || 0,
             date: document.getElementById('game-date').value,
             user_id: currentUser.id,
             screenshot_url: screenshot_url
         };
 
-        if (isEditing) {
-            const id = parseInt(appDOM.entryId?.value);
-            const { data, error } = await _supabase
-                .from('games')
-                .update(entryData)
-                .eq('id', id)
-                .select();
-
-            if (error) throw error;
-            const index = games.findIndex(g => g.id === id);
-            if (index !== -1) games[index] = data[0];
+        if (!isLocalMode && _supabase) {
+            try {
+                if (isEditing) {
+                    const id = parseInt(appDOM.entryId?.value);
+                    const { data, error } = await _supabase
+                        .from('games')
+                        .update(entryData)
+                        .eq('id', id)
+                        .select();
+                    if (error) throw error;
+                    const index = games.findIndex(g => g.id === id);
+                    if (index !== -1) games[index] = data[0];
+                } else {
+                    const { data, error } = await _supabase
+                        .from('games')
+                        .insert([entryData])
+                        .select();
+                    if (error) throw error;
+                    games.unshift(data[0]);
+                }
+            } catch (err) {
+                console.warn('Supabase insert failed, saving locally:', err);
+                isLocalMode = true;
+                saveGameLocally(entryData);
+            }
         } else {
-            const { data, error } = await _supabase
-                .from('games')
-                .insert([entryData])
-                .select();
-
-            if (error) throw error;
-            games.unshift(data[0]);
+            saveGameLocally(entryData);
         }
 
         updateUI();
         appDOM.scoreModal?.classList.remove('active');
         appDOM.form?.reset();
     } catch (error) {
-        console.error('Error saving:', error.message);
-        alert('Error saving: ' + error.message);
+        console.error('Error saving game:', error.message);
+        alert('Error saving game: ' + error.message);
     } finally {
         safeSetText(appDOM.submitBtn, 'Save Result');
         if (appDOM.submitBtn) appDOM.submitBtn.disabled = false;
     }
 }
 
+function saveGameLocally(entryData) {
+    if (isEditing) {
+        const id = parseInt(appDOM.entryId?.value);
+        const index = games.findIndex(g => g.id === id);
+        if (index !== -1) {
+            // Keep previous screenshot if not replaced
+            if (!entryData.screenshot_url && games[index].screenshot_url) {
+                entryData.screenshot_url = games[index].screenshot_url;
+            }
+            games[index] = entryData;
+        }
+    } else {
+        games.unshift(entryData);
+    }
+    localStorage.setItem('gamenight_games', JSON.stringify(games));
+}
+
 async function deleteGame(id) {
-    if (!currentUser) return;
+    if (!isAdmin()) {
+        alert('Permission Denied: Only the tournament admin (' + ADMIN_EMAIL + ') can delete scores.');
+        return;
+    }
     if (confirm('Are you sure you want to delete this game record?')) {
         try {
-            const { error } = await _supabase
-                .from('games')
-                .delete()
-                .eq('id', id);
-
-            if (error) throw error;
+            if (!isLocalMode && _supabase) {
+                try {
+                    const { error } = await _supabase
+                        .from('games')
+                        .delete()
+                        .eq('id', id);
+                    if (error) throw error;
+                } catch (e) {
+                    console.warn('Cloud delete failed, deleting locally:', e);
+                }
+            }
             games = games.filter(g => g.id !== id);
+            localStorage.setItem('gamenight_games', JSON.stringify(games));
             updateUI();
         } catch (error) {
             console.error('Error deleting:', error.message);
@@ -278,7 +557,10 @@ async function deleteGame(id) {
 }
 
 function editGame(id) {
-    if (!currentUser) return;
+    if (!isAdmin()) {
+        alert('Permission Denied: Only the tournament admin (' + ADMIN_EMAIL + ') can edit scores.');
+        return;
+    }
     const game = games.find(g => g.id === id);
     if (!game) return;
 
@@ -287,19 +569,33 @@ function editGame(id) {
     safeSetText(appDOM.submitBtn, 'Update Result');
 
     if (appDOM.entryId) appDOM.entryId.value = game.id;
-    document.getElementById('game-name').value = game.game;
+
+    // Check if game is in dropdown or custom
+    const standardGames = ['Blox Fruits', 'Whot', 'Jujutsu Infinite', 'Shadow Boxing'];
+    if (appDOM.gameNameSelect) {
+        if (standardGames.includes(game.game)) {
+            appDOM.gameNameSelect.value = game.game;
+            if (appDOM.customGameGroup) appDOM.customGameGroup.style.display = 'none';
+        } else {
+            appDOM.gameNameSelect.value = 'Other';
+            if (appDOM.customGameGroup) {
+                appDOM.customGameGroup.style.display = 'block';
+                if (appDOM.customGameName) appDOM.customGameName.value = game.game;
+            }
+        }
+    }
+
     document.getElementById('score').value = game.score;
     document.getElementById('game-date').value = game.date;
 
-    // Screenshot editing is not supported in this simple version
     appDOM.scoreModal?.classList.add('active');
 }
 
 function updateUI(searchTerm = '') {
-    const lowerSearch = searchTerm.toLowerCase();
+    const lowerSearch = (searchTerm || '').toLowerCase();
     const filteredGames = games.filter(g =>
-        g.game.toLowerCase().includes(lowerSearch) ||
-        g.winner.toLowerCase().includes(lowerSearch)
+        (g.game || '').toLowerCase().includes(lowerSearch) ||
+        (g.winner || '').toLowerCase().includes(lowerSearch)
     );
 
     renderLeaderboard(filteredGames);
@@ -315,10 +611,26 @@ function renderLeaderboard(data = games) {
             standings[g.winner] = { name: g.winner, games: 0, totalScore: 0 };
         }
         standings[g.winner].games++;
-        standings[g.winner].totalScore += g.score;
+        standings[g.winner].totalScore += (parseInt(g.score) || 0);
     });
 
     const sortedPlayers = Object.values(standings).sort((a, b) => b.totalScore - a.totalScore);
+
+    if (sortedPlayers.length === 0) {
+        safeSetHTML(appDOM.leaderboardBody, `
+            <tr>
+                <td colspan="5" style="text-align: center; padding: 2.5rem 1rem; color: var(--text-muted); font-size: 0.95rem;">
+                    No games recorded yet. Submit the first score to start the tournament!
+                </td>
+            </tr>
+        `);
+        safeSetHTML(appDOM.standingsList, `
+            <div style="text-align: center; padding: 2rem 1rem; color: var(--text-muted); background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px dashed var(--glass-border);">
+                No games recorded yet.
+            </div>
+        `);
+        return;
+    }
 
     safeSetHTML(appDOM.leaderboardBody, sortedPlayers.map((player, index) => `
         <tr class="rank-${index + 1}">
@@ -347,7 +659,21 @@ function renderLeaderboard(data = games) {
 }
 
 function renderRecentGames(data = games) {
-    safeSetHTML(appDOM.gamesList, data.slice(0, 12).map(g => `
+    if (data.length === 0) {
+        safeSetHTML(appDOM.gamesList, `
+            <div style="grid-column: 1/-1; text-align: center; padding: 3rem 1.5rem; color: var(--text-muted); background: rgba(255, 255, 255, 0.02); border-radius: 16px; border: 1px dashed var(--glass-border);">
+                <div style="font-size: 2rem; margin-bottom: 0.5rem;">🎮</div>
+                <div style="font-weight: 600; font-size: 1.1rem; color: var(--text-main); margin-bottom: 0.25rem;">Tournament Ready!</div>
+                <div>No games have been recorded yet. Click <strong>+ New Score</strong> above to log your first match.</div>
+            </div>
+        `);
+        return;
+    }
+
+    safeSetHTML(appDOM.gamesList, data.slice(0, 12).map(g => {
+        const canManage = isAdmin();
+
+        return `
         <div class="game-card">
             <div class="game-title">${g.game}</div>
             <div class="game-winner">
@@ -356,7 +682,7 @@ function renderRecentGames(data = games) {
             </div>
             <div class="game-meta">
                 <span>+${g.score} pts</span>
-                <span>${new Date(g.date).toLocaleDateString()}</span>
+                <span>${g.date}</span>
             </div>
             ${g.screenshot_url ? `
             <div class="game-proof" style="margin-top: 10px;">
@@ -365,14 +691,15 @@ function renderRecentGames(data = games) {
                 </a>
             </div>
             ` : ''}
-            ${(currentUser && (g.user_id === currentUser.id || currentUser.email === ADMIN_EMAIL)) ? `
-            <div class="game-actions">
+            ${canManage ? `
+            <div class="game-actions" style="margin-top: 12px; display: flex; gap: 8px;">
                 <button class="btn-action" onclick="editGame(${g.id})">Edit</button>
                 <button class="btn-action btn-delete" onclick="deleteGame(${g.id})">Delete</button>
             </div>
             ` : ''}
         </div>
-    `).join(''));
+        `;
+    }).join(''));
 }
 
 function updateStats() {
@@ -380,7 +707,7 @@ function updateStats() {
 
     const standings = {};
     games.forEach(g => {
-        standings[g.winner] = (standings[g.winner] || 0) + g.score;
+        standings[g.winner] = (standings[g.winner] || 0) + (parseInt(g.score) || 0);
     });
     const sorted = Object.entries(standings).sort((a, b) => b[1] - a[1]);
     safeSetText(appDOM.topPlayer, sorted.length > 0 ? sorted[0][0] : '-');
