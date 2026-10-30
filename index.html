@@ -104,18 +104,10 @@
                 <input type="hidden" id="entry-id">
                 <div class="form-group">
                     <label for="game-name">Game Name</label>
-                    <select id="game-name" required>
-                        <option value="" disabled selected>Select a game</option>
-                        <option value="Blox Fruits">Blox Fruits</option>
-                        <option value="Whot">Whot</option>
-                        <option value="Jujutsu Infinite">Jujutsu Infinite</option>
-                        <option value="Shadow Boxing">Shadow Boxing</option>
-                        <option value="Other">Other (Custom Game)</option>
-                    </select>
-                </div>
-                <div class="form-group" id="custom-game-group" style="display: none;">
-                    <label for="custom-game-name">Custom Game Name</label>
-                    <input type="text" id="custom-game-name" placeholder="Enter game title">
+                    <input type="text" id="game-name" list="game-suggestions" placeholder="Enter game title (e.g. FIFA, Uno, Smash Bros)" required autocomplete="off">
+                    <datalist id="game-suggestions">
+                        <!-- Populated dynamically from tournament games -->
+                    </datalist>
                 </div>
                 <div class="form-group">
                     <label for="score">Score / Points</label>

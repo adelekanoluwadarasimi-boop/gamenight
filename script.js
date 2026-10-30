@@ -45,9 +45,7 @@ const appDOM = {
     get imageModalFullSize() { return document.getElementById('proof-image-full'); },
     get standingsList() { return document.getElementById('standings-list'); },
     get statusBadge() { return document.getElementById('backend-status-badge'); },
-    get gameNameSelect() { return document.getElementById('game-name'); },
-    get customGameGroup() { return document.getElementById('custom-game-group'); },
-    get customGameName() { return document.getElementById('custom-game-name'); },
+    get gameNameInput() { return document.getElementById('game-name'); },
     get resetGamesBtn() { return document.getElementById('reset-games-btn'); }
 };
 
@@ -84,13 +82,6 @@ function updateModeIndicator() {
 
 // Initialize App
 async function init() {
-    // Custom game input toggle
-    appDOM.gameNameSelect?.addEventListener('change', (e) => {
-        if (appDOM.customGameGroup) {
-            appDOM.customGameGroup.style.display = e.target.value === 'Other' ? 'block' : 'none';
-        }
-    });
-
     await checkUser();
     await fetchGames();
     updateModeIndicator();
@@ -102,7 +93,6 @@ async function init() {
         safeSetText(appDOM.submitBtn, 'Save Result');
         appDOM.form?.reset();
         if (appDOM.entryId) appDOM.entryId.value = '';
-        if (appDOM.customGameGroup) appDOM.customGameGroup.style.display = 'none';
         const dateInput = document.getElementById('game-date');
         if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
         appDOM.scoreModal?.classList.add('active');
@@ -452,12 +442,8 @@ async function handleFormSubmit(e) {
             }
         }
 
-        // Determine Game Name (handle 'Other')
-        let selectedGame = appDOM.gameNameSelect ? appDOM.gameNameSelect.value : '';
-        if (selectedGame === 'Other') {
-            const customTitle = appDOM.customGameName ? appDOM.customGameName.value.trim() : '';
-            selectedGame = customTitle || 'Custom Game';
-        }
+        // Determine Game Name
+        const selectedGame = (appDOM.gameNameInput?.value || document.getElementById('game-name')?.value || '').trim() || 'Custom Game';
 
         const winnerName = currentUser.user_metadata?.display_name || currentUser.displayName || currentUser.email.split('@')[0];
 
@@ -569,26 +555,19 @@ function editGame(id) {
     safeSetText(appDOM.submitBtn, 'Update Result');
 
     if (appDOM.entryId) appDOM.entryId.value = game.id;
-
-    // Check if game is in dropdown or custom
-    const standardGames = ['Blox Fruits', 'Whot', 'Jujutsu Infinite', 'Shadow Boxing'];
-    if (appDOM.gameNameSelect) {
-        if (standardGames.includes(game.game)) {
-            appDOM.gameNameSelect.value = game.game;
-            if (appDOM.customGameGroup) appDOM.customGameGroup.style.display = 'none';
-        } else {
-            appDOM.gameNameSelect.value = 'Other';
-            if (appDOM.customGameGroup) {
-                appDOM.customGameGroup.style.display = 'block';
-                if (appDOM.customGameName) appDOM.customGameName.value = game.game;
-            }
-        }
-    }
+    if (appDOM.gameNameInput) appDOM.gameNameInput.value = game.game;
 
     document.getElementById('score').value = game.score;
     document.getElementById('game-date').value = game.date;
 
     appDOM.scoreModal?.classList.add('active');
+}
+
+function updateGameSuggestions() {
+    const datalist = document.getElementById('game-suggestions');
+    if (!datalist) return;
+    const uniqueGames = [...new Set(games.map(g => g.game).filter(Boolean))];
+    safeSetHTML(datalist, uniqueGames.map(name => `<option value="${name}">`).join(''));
 }
 
 function updateUI(searchTerm = '') {
@@ -601,6 +580,7 @@ function updateUI(searchTerm = '') {
     renderLeaderboard(filteredGames);
     renderRecentGames(filteredGames);
     updateStats();
+    updateGameSuggestions();
 }
 
 function renderLeaderboard(data = games) {
