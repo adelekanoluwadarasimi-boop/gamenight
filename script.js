@@ -382,6 +382,39 @@ async function handleResetAllGames() {
     }
 }
 
+function compressImage(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                const maxDim = 800;
+                if (width > maxDim || height > maxDim) {
+                    if (width > height) {
+                        height = Math.round((height * maxDim) / width);
+                        width = maxDim;
+                    } else {
+                        width = Math.round((width * maxDim) / height);
+                        height = maxDim;
+                    }
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', 0.7));
+            };
+            img.onerror = () => resolve(e.target.result);
+            img.src = e.target.result;
+        };
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(file);
+    });
+}
+
 async function handleFormSubmit(e) {
     e.preventDefault();
     if (!currentUser) {
@@ -419,31 +452,32 @@ async function handleFormSubmit(e) {
                         screenshot_url = urlData.publicUrl;
                     }
                 } catch (e) {
-                    console.warn('Storage upload failed, falling back to local image data:', e);
+                    console.warn('Storage upload failed, falling back to compressed image data:', e);
                 }
             }
 
             if (!screenshot_url) {
-                screenshot_url = await new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onload = (ev) => resolve(ev.target.result);
-                    reader.onerror = () => resolve('');
-                    reader.readAsDataURL(file);
-                });
+                screenshot_url = await compressImage(file);
             }
         }
 
         const selectedGame = (appDOM.gameNameInput?.value || document.getElementById('game-name')?.value || '').trim() || 'Custom Game';
         const winnerName = currentUser.user_metadata?.display_name || currentUser.displayName || currentUser.email.split('@')[0];
 
+        // Ensure user_id is a valid UUID before sending to Supabase to prevent Postgres 22P02 error
+        const isValidUUID = (str) => typeof str === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+        const validUserId = (currentUser?.id && isValidUUID(currentUser.id)) ? currentUser.id : null;
+
         const entryData = {
             game: selectedGame,
             winner: winnerName,
             score: parseInt(document.getElementById('score').value) || 0,
             date: document.getElementById('game-date').value,
-            user_id: currentUser.id,
             screenshot_url: screenshot_url
         };
+        if (validUserId) {
+            entryData.user_id = validUserId;
+        }
 
         if (!isLocalMode && _supabase) {
             try {
@@ -467,7 +501,7 @@ async function handleFormSubmit(e) {
                 }
             } catch (err) {
                 console.error('Supabase save error:', err);
-                alert('Database error: ' + err.message);
+                alert('Database error: ' + (err.message || 'Failed to save score.'));
                 return;
             }
         } else {
@@ -689,3 +723,10 @@ function updateStats() {
 }
 
 init();
+
+// Auto-sync polling every 5 seconds for cross-device live updates
+setInterval(() => {
+    if (!isLocalMode && _supabase && !document.hidden) {
+        fetchGames();
+    }
+}, 5000);
