@@ -72,11 +72,11 @@ function updateModeIndicator() {
     if (isLocalMode) {
         appDOM.statusBadge.textContent = '⚡ Local Tournament Mode';
         appDOM.statusBadge.className = 'badge-status';
-        appDOM.statusBadge.title = 'Scores are stored locally on this device. (Supabase cloud offline or unconfigured)';
+        appDOM.statusBadge.title = 'Scores are stored locally on this device.';
     } else {
-        appDOM.statusBadge.textContent = '🟢 Cloud Connected';
+        appDOM.statusBadge.textContent = '🟢 Cloud Live Sync';
         appDOM.statusBadge.className = 'badge-status cloud';
-        appDOM.statusBadge.title = 'Connected to Supabase cloud database.';
+        appDOM.statusBadge.title = 'Connected to Supabase. Scores sync live across all devices.';
     }
 }
 
@@ -85,6 +85,19 @@ async function init() {
     await checkUser();
     await fetchGames();
     updateModeIndicator();
+
+    // Setup Supabase Realtime channel so scores update live for everyone
+    if (_supabase && !isLocalMode) {
+        try {
+            _supabase.channel('public:games')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'games' }, () => {
+                    fetchGames();
+                })
+                .subscribe();
+        } catch (e) {
+            console.warn('Realtime subscription error:', e);
+        }
+    }
 
     // Event Listeners
     appDOM.addBtn?.addEventListener('click', () => {
@@ -124,9 +137,9 @@ async function init() {
     if (appDOM.statusBadge) {
         appDOM.statusBadge.addEventListener('click', () => {
             if (isLocalMode) {
-                alert("GameNight is currently running in Local Tournament Mode!\n\nAll accounts, games, scores, and screenshots are saved directly on this browser.\n\nTo share live scores across multiple devices over the internet, connect a free Supabase project by following the README instructions.");
+                alert("GameNight is currently in Local Storage Mode.\n\nConnect to Supabase to enable multi-device live sync.");
             } else {
-                alert("Connected to Supabase cloud! All scores are synchronized in real-time.");
+                alert("🟢 Supabase Live Cloud Sync Active!\n\nAll scores submitted by you or your friends update instantly across every device.");
             }
         });
     }
@@ -134,31 +147,35 @@ async function init() {
 
 // User & Auth Functions
 async function checkUser() {
-    if (_supabase && !isLocalMode) {
+    if (_supabase) {
         try {
-            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Auth timeout')), 2500));
-            const getUserPromise = _supabase.auth.getUser();
-            const { data, error } = await Promise.race([getUserPromise, timeoutPromise]);
-            if (!error && data?.user) {
-                currentUser = data.user;
-                updateAuthUI();
-                return;
+            const { data, error } = await _supabase.auth.getUser();
+            if (error) {
+                if (error.message && (error.message.includes('fetch') || error.message.includes('Network'))) {
+                    throw error;
+                }
+                currentUser = null;
+                isLocalMode = false;
+            } else {
+                currentUser = data?.user || null;
+                isLocalMode = false;
             }
         } catch (e) {
-            console.warn('Supabase auth unavailable; enabling Local Tournament Mode:', e.message);
+            console.warn('Supabase auth offline, falling back to local session:', e.message);
             isLocalMode = true;
         }
     } else {
         isLocalMode = true;
     }
 
-    // Check Local Storage for active session
-    const localUserJson = localStorage.getItem('gamenight_current_user');
-    if (localUserJson) {
-        try {
-            currentUser = JSON.parse(localUserJson);
-        } catch (_) {
-            currentUser = null;
+    if (isLocalMode) {
+        const localUserJson = localStorage.getItem('gamenight_current_user');
+        if (localUserJson) {
+            try {
+                currentUser = JSON.parse(localUserJson);
+            } catch (_) {
+                currentUser = null;
+            }
         }
     }
     updateAuthUI();
@@ -210,22 +227,20 @@ async function handleAuthSubmit(e) {
     const password = document.getElementById('auth-password').value;
     const displayName = document.getElementById('signup-name')?.value?.trim() || email.split('@')[0];
 
-    // Try Supabase first if not in local mode
+    // Try Supabase Auth
     if (!isLocalMode && _supabase) {
         try {
-            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Network timeout')), 3000));
-            let authPromise;
+            let result;
             if (isLoginMode) {
-                authPromise = _supabase.auth.signInWithPassword({ email, password });
+                result = await _supabase.auth.signInWithPassword({ email, password });
             } else {
-                authPromise = _supabase.auth.signUp({
+                result = await _supabase.auth.signUp({
                     email,
                     password,
                     options: { data: { display_name: displayName } }
                 });
             }
 
-            const result = await Promise.race([authPromise, timeoutPromise]);
             if (result.error) throw result.error;
 
             currentUser = result.data.user;
@@ -235,39 +250,35 @@ async function handleAuthSubmit(e) {
 
             if (!isLoginMode && !result.data.session) {
                 alert('Account created! Please check your email for confirmation if required.');
+            } else {
+                alert(`Welcome, ${displayName}! You are ready to log scores.`);
             }
             return;
         } catch (error) {
-            console.warn('Supabase auth failed; switching to Local Mode:', error.message);
-            isLocalMode = true;
-            updateModeIndicator();
-            // Continue below to handle in local mode
+            if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('NetworkError'))) {
+                console.warn('Network error, falling back to local mode:', error.message);
+                isLocalMode = true;
+                updateModeIndicator();
+            } else {
+                alert(error.message);
+                return;
+            }
         }
     }
 
-    // Local Tournament Auth Handler
+    // Local Tournament Auth Fallback
     try {
         let localUsers = JSON.parse(localStorage.getItem('gamenight_local_users') || '[]');
 
         if (isLoginMode) {
             const user = localUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
             if (!user) {
-                // Friendly error with option to auto-register
-                const autoRegister = confirm(`Player account "${email}" was not found.\n\nWould you like to register as a new player with this name?`);
+                const autoRegister = confirm(`Player account "${email}" not found locally. Would you like to create this account now?`);
                 if (autoRegister) {
-                    const newUser = {
-                        id: 'usr_' + Date.now(),
-                        email: email,
-                        password: password,
-                        displayName: displayName
-                    };
+                    const newUser = { id: 'usr_' + Date.now(), email, password, displayName };
                     localUsers.push(newUser);
                     localStorage.setItem('gamenight_local_users', JSON.stringify(localUsers));
-                    currentUser = {
-                        id: newUser.id,
-                        email: newUser.email,
-                        user_metadata: { display_name: newUser.displayName }
-                    };
+                    currentUser = { id: newUser.id, email: newUser.email, user_metadata: { display_name: newUser.displayName } };
                 } else {
                     return;
                 }
@@ -276,40 +287,26 @@ async function handleAuthSubmit(e) {
                     alert('Incorrect password. Please try again.');
                     return;
                 }
-                currentUser = {
-                    id: user.id,
-                    email: user.email,
-                    user_metadata: { display_name: user.displayName }
-                };
+                currentUser = { id: user.id, email: user.email, user_metadata: { display_name: user.displayName } };
             }
         } else {
-            // Sign Up
             const existing = localUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
             if (existing) {
                 alert('An account with this email/name already exists. Switching to Login.');
                 setAuthMode(true);
                 return;
             }
-            const newUser = {
-                id: 'usr_' + Date.now(),
-                email: email,
-                password: password,
-                displayName: displayName
-            };
+            const newUser = { id: 'usr_' + Date.now(), email, password, displayName };
             localUsers.push(newUser);
             localStorage.setItem('gamenight_local_users', JSON.stringify(localUsers));
-            currentUser = {
-                id: newUser.id,
-                email: newUser.email,
-                user_metadata: { display_name: newUser.displayName }
-            };
+            currentUser = { id: newUser.id, email: newUser.email, user_metadata: { display_name: newUser.displayName } };
         }
 
         localStorage.setItem('gamenight_current_user', JSON.stringify(currentUser));
         updateAuthUI();
         appDOM.authModal?.classList.remove('active');
         appDOM.authForm?.reset();
-        alert(`Welcome, ${currentUser.user_metadata.display_name}! You are ready to log scores.`);
+        alert(`Welcome, ${currentUser.user_metadata.display_name}!`);
     } catch (err) {
         alert('Authentication error: ' + err.message);
     }
@@ -325,24 +322,20 @@ window.openImageModal = function (url) {
 async function fetchGames() {
     if (!isLocalMode && _supabase) {
         try {
-            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Fetch timeout')), 3000));
-            const fetchPromise = _supabase.from('games').select('*').order('date', { ascending: false });
-            const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+            const { data, error } = await _supabase
+                .from('games')
+                .select('*')
+                .order('date', { ascending: false });
+
             if (error) throw error;
             games = data || [];
             updateUI();
             return;
         } catch (error) {
-            console.warn('Error fetching from Supabase; falling back to local storage:', error.message);
+            console.warn('Error fetching from Supabase, checking local:', error.message);
             isLocalMode = true;
             updateModeIndicator();
         }
-    }
-
-    // Automatically purge old sample/dummy games if present
-    if (!localStorage.getItem('gamenight_purge_samples_v2')) {
-        localStorage.removeItem('gamenight_games');
-        localStorage.setItem('gamenight_purge_samples_v2', 'true');
     }
 
     // Local Storage Data
@@ -409,7 +402,6 @@ async function handleFormSubmit(e) {
         const file = appDOM.proofInput?.files[0];
 
         if (file) {
-            // If Supabase cloud is active, upload to bucket
             if (!isLocalMode && _supabase) {
                 try {
                     const fileExt = file.name.split('.').pop();
@@ -431,7 +423,6 @@ async function handleFormSubmit(e) {
                 }
             }
 
-            // Convert to base64 Data URL if not uploaded to cloud
             if (!screenshot_url) {
                 screenshot_url = await new Promise((resolve) => {
                     const reader = new FileReader();
@@ -442,13 +433,10 @@ async function handleFormSubmit(e) {
             }
         }
 
-        // Determine Game Name
         const selectedGame = (appDOM.gameNameInput?.value || document.getElementById('game-name')?.value || '').trim() || 'Custom Game';
-
         const winnerName = currentUser.user_metadata?.display_name || currentUser.displayName || currentUser.email.split('@')[0];
 
         const entryData = {
-            id: isEditing ? parseInt(appDOM.entryId?.value) : Date.now(),
             game: selectedGame,
             winner: winnerName,
             score: parseInt(document.getElementById('score').value) || 0,
@@ -468,21 +456,22 @@ async function handleFormSubmit(e) {
                         .select();
                     if (error) throw error;
                     const index = games.findIndex(g => g.id === id);
-                    if (index !== -1) games[index] = data[0];
+                    if (index !== -1 && data && data[0]) games[index] = data[0];
                 } else {
                     const { data, error } = await _supabase
                         .from('games')
                         .insert([entryData])
                         .select();
                     if (error) throw error;
-                    games.unshift(data[0]);
+                    if (data && data[0]) games.unshift(data[0]);
                 }
             } catch (err) {
-                console.warn('Supabase insert failed, saving locally:', err);
-                isLocalMode = true;
-                saveGameLocally(entryData);
+                console.error('Supabase save error:', err);
+                alert('Database error: ' + err.message);
+                return;
             }
         } else {
+            entryData.id = isEditing ? parseInt(appDOM.entryId?.value) : Date.now();
             saveGameLocally(entryData);
         }
 
@@ -503,7 +492,6 @@ function saveGameLocally(entryData) {
         const id = parseInt(appDOM.entryId?.value);
         const index = games.findIndex(g => g.id === id);
         if (index !== -1) {
-            // Keep previous screenshot if not replaced
             if (!entryData.screenshot_url && games[index].screenshot_url) {
                 entryData.screenshot_url = games[index].screenshot_url;
             }
@@ -530,7 +518,7 @@ async function deleteGame(id) {
                         .eq('id', id);
                     if (error) throw error;
                 } catch (e) {
-                    console.warn('Cloud delete failed, deleting locally:', e);
+                    console.warn('Cloud delete failed:', e);
                 }
             }
             games = games.filter(g => g.id !== id);
